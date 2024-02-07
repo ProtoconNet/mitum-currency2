@@ -5,6 +5,7 @@ import (
 	"fmt"
 	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
 	stateextension "github.com/ProtoconNet/mitum-currency/v3/state/extension"
+	"github.com/ProtoconNet/mitum2/util/localtime"
 	"sync"
 	"time"
 
@@ -70,15 +71,16 @@ func (bs *BlockSession) Prepare() error {
 	bs.Lock()
 	defer bs.Unlock()
 
+	now := localtime.Now()
 	if err := bs.prepareOperationsTree(); err != nil {
 		return err
 	}
 
-	if err := bs.prepareBlock(); err != nil {
+	if err := bs.prepareBlock(now); err != nil {
 		return err
 	}
 
-	if err := bs.prepareOperations(); err != nil {
+	if err := bs.prepareOperations(now); err != nil {
 		return err
 	}
 
@@ -165,7 +167,7 @@ func (bs *BlockSession) prepareOperationsTree() error {
 	return nil
 }
 
-func (bs *BlockSession) prepareBlock() error {
+func (bs *BlockSession) prepareBlock(digested time.Time) error {
 	if bs.block == nil {
 		return nil
 	}
@@ -182,7 +184,15 @@ func (bs *BlockSession) prepareBlock() error {
 		bs.block.Manifest().ProposedAt(),
 	)
 
-	doc, err := NewManifestDoc(manifest, bs.st.database.Encoder(), bs.block.Manifest().Height(), bs.ops, bs.block.SignedAt(), bs.proposal.ProposalFact().Proposer(), bs.proposal.ProposalFact().Point().Round())
+	doc, err := NewManifestDoc(
+		manifest,
+		bs.st.database.Encoder(),
+		bs.block.Manifest().Height(),
+		bs.ops, bs.block.SignedAt(),
+		bs.proposal.ProposalFact().Proposer(),
+		bs.proposal.ProposalFact().Point().Round(),
+		digested,
+	)
 	if err != nil {
 		return err
 	}
@@ -191,7 +201,7 @@ func (bs *BlockSession) prepareBlock() error {
 	return nil
 }
 
-func (bs *BlockSession) prepareOperations() error {
+func (bs *BlockSession) prepareOperations(digested time.Time) error {
 	if len(bs.ops) < 1 {
 		return nil
 	}
@@ -230,6 +240,7 @@ func (bs *BlockSession) prepareOperations() error {
 				inState,
 				reasonMsg,
 				uint64(i),
+				digested,
 			)
 			if err != nil {
 				return err

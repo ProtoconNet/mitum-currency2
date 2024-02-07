@@ -2,12 +2,12 @@ package digest
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/ProtoconNet/mitum2/util/encoder"
 	"github.com/ProtoconNet/mitum2/util/hint"
-	"github.com/ProtoconNet/mitum2/util/localtime"
 )
 
 type OperationValueJSONMarshaler struct {
@@ -15,10 +15,11 @@ type OperationValueJSONMarshaler struct {
 	Hash        util.Hash      `json:"hash"`
 	Operation   base.Operation `json:"operation"`
 	Height      base.Height    `json:"height"`
-	ConfirmedAt localtime.Time `json:"confirmed_at"`
+	ConfirmedAt time.Time      `json:"confirmed_at"`
 	Reason      string         `json:"reason"`
 	InState     bool           `json:"in_state"`
 	Index       uint64         `json:"index"`
+	DigestedAt  time.Time      `json:"digested_at"`
 }
 
 func (va OperationValue) MarshalJSON() ([]byte, error) {
@@ -27,20 +28,22 @@ func (va OperationValue) MarshalJSON() ([]byte, error) {
 		Hash:        va.op.Fact().Hash(),
 		Operation:   va.op,
 		Height:      va.height,
-		ConfirmedAt: localtime.New(va.confirmedAt),
+		ConfirmedAt: va.confirmedAt,
 		Reason:      va.reason,
 		InState:     va.inState,
 		Index:       va.index,
+		DigestedAt:  va.digestedAt,
 	})
 }
 
 type OperationValueJSONUnmarshaler struct {
 	Operation   json.RawMessage `json:"operation"`
 	Height      base.Height     `json:"height"`
-	ConfirmedAt localtime.Time  `json:"confirmed_at"`
+	ConfirmedAt time.Time       `json:"confirmed_at"`
 	InState     bool            `json:"in_state"`
 	Reason      string          `json:"reason"`
 	Index       uint64          `json:"index"`
+	DigestedAt  time.Time       `json:"digested_at"`
 }
 
 func (va *OperationValue) DecodeJSON(b []byte, enc encoder.Encoder) error {
@@ -55,9 +58,10 @@ func (va *OperationValue) DecodeJSON(b []byte, enc encoder.Encoder) error {
 
 	va.reason = uva.Reason
 	va.height = uva.Height
-	va.confirmedAt = uva.ConfirmedAt.Time
+	va.confirmedAt = uva.ConfirmedAt
 	va.inState = uva.InState
 	va.index = uva.Index
+	va.digestedAt = uva.DigestedAt
 
 	return nil
 }

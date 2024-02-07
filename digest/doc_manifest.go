@@ -1,7 +1,6 @@
 package digest
 
 import (
-	"github.com/ProtoconNet/mitum2/util/localtime"
 	"time"
 
 	mongodbstorage "github.com/ProtoconNet/mitum-currency/v3/digest/mongodb"
@@ -29,13 +28,13 @@ func NewManifestDoc(
 	confirmedAt time.Time,
 	proposer base.Address,
 	round base.Round,
+	digestedAt time.Time,
 ) (ManifestDoc, error) {
 	b, err := mongodbstorage.NewBaseDoc(nil, manifest, enc)
 	if err != nil {
 		return ManifestDoc{}, err
 	}
 
-	now := localtime.Now().UTC()
 	return ManifestDoc{
 		BaseDoc:     b,
 		va:          manifest,
@@ -44,7 +43,7 @@ func NewManifestDoc(
 		confirmedAt: confirmedAt,
 		proposer:    proposer,
 		round:       round,
-		digestedAt:  now,
+		digestedAt:  digestedAt,
 	}, nil
 }
 

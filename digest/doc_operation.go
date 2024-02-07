@@ -12,10 +12,11 @@ import (
 
 type OperationDoc struct {
 	mongodbstorage.BaseDoc
-	va        OperationValue
-	op        base.Operation
-	addresses []string
-	height    base.Height
+	va         OperationValue
+	op         base.Operation
+	addresses  []string
+	height     base.Height
+	digestedAt time.Time
 }
 
 func NewOperationDoc(
@@ -26,6 +27,7 @@ func NewOperationDoc(
 	inState bool,
 	reason string,
 	index uint64,
+	digestedAt time.Time,
 ) (OperationDoc, error) {
 	var addresses []string
 	if ads, ok := op.Fact().(types.Addresses); ok {
@@ -39,18 +41,19 @@ func NewOperationDoc(
 		}
 	}
 
-	va := NewOperationValue(op, height, confirmedAt, inState, reason, index)
+	va := NewOperationValue(op, height, confirmedAt, inState, reason, index, digestedAt)
 	b, err := mongodbstorage.NewBaseDoc(nil, va, enc)
 	if err != nil {
 		return OperationDoc{}, err
 	}
 
 	return OperationDoc{
-		BaseDoc:   b,
-		va:        va,
-		op:        op,
-		addresses: addresses,
-		height:    height,
+		BaseDoc:    b,
+		va:         va,
+		op:         op,
+		addresses:  addresses,
+		height:     height,
+		digestedAt: digestedAt,
 	}, nil
 }
 
@@ -64,6 +67,7 @@ func (doc OperationDoc) MarshalBSON() ([]byte, error) {
 	m["fact"] = doc.op.Fact().Hash()
 	m["height"] = doc.height
 	m["index"] = doc.va.index
+	m["digested_at"] = doc.digestedAt
 
 	return bsonenc.Marshal(m)
 }

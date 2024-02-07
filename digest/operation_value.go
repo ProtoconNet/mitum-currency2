@@ -19,6 +19,7 @@ type OperationValue struct {
 	inState     bool
 	reason      string
 	index       uint64
+	digestedAt  time.Time
 }
 
 func NewOperationValue(
@@ -28,6 +29,7 @@ func NewOperationValue(
 	inState bool,
 	reason string,
 	index uint64,
+	digestedAt time.Time,
 ) OperationValue {
 	return OperationValue{
 		BaseHinter:  hint.NewBaseHinter(OperationValueHint),
@@ -37,6 +39,7 @@ func NewOperationValue(
 		inState:     inState,
 		reason:      reason,
 		index:       index,
+		digestedAt:  digestedAt,
 	}
 }
 

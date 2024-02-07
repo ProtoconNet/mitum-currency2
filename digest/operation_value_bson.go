@@ -27,6 +27,7 @@ func (va OperationValue) MarshalBSON() ([]byte, error) {
 			"in_state":     va.inState,
 			"reason":       va.reason,
 			"index":        va.index,
+			"digested_at":  va.digestedAt,
 		},
 	)
 }
@@ -39,6 +40,7 @@ type OperationValueBSONUnmarshaler struct {
 	InState     bool        `bson:"in_state"`
 	RS          string      `bson:"reason"`
 	Index       uint64      `bson:"index"`
+	DigestedAt  time.Time   `bson:"digested_at"`
 }
 
 func (va *OperationValue) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
@@ -67,5 +69,6 @@ func (va *OperationValue) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 	va.inState = uva.InState
 	va.index = uva.Index
 	va.reason = uva.RS
+	va.digestedAt = uva.DigestedAt
 	return nil
 }
