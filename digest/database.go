@@ -285,7 +285,7 @@ func (st *Database) Manifests(
 	reverse bool,
 	offset base.Height,
 	limit int64,
-	callback func(base.Height, base.Manifest, uint64, string, string, uint64) (bool, error),
+	callback func(base.Height, base.Manifest, uint64, string, string, uint64, string) (bool, error),
 ) error {
 	var filter bson.M
 	if offset > base.NilHeight {
@@ -318,11 +318,11 @@ func (st *Database) Manifests(
 		defaultColNameBlock,
 		filter,
 		func(cursor *mongo.Cursor) (bool, error) {
-			va, ops, confirmed, proposer, round, err := LoadManifest(cursor.Decode, st.database.Encoders())
+			va, ops, confirmed, proposer, round, digested, err := LoadManifest(cursor.Decode, st.database.Encoders())
 			if err != nil {
 				return false, err
 			}
-			return callback(va.Height(), va, ops, confirmed, proposer, round)
+			return callback(va.Height(), va, ops, confirmed, proposer, round, digested)
 		},
 		opt,
 	)
@@ -758,17 +758,17 @@ func (st *Database) currencies() ([]string, error) {
 	return cids, nil
 }
 
-func (st *Database) ManifestByHeight(height base.Height) (base.Manifest, uint64, string, string, uint64, error) {
+func (st *Database) ManifestByHeight(height base.Height) (base.Manifest, uint64, string, string, uint64, string, error) {
 	q := util.NewBSONFilter("height", height).D()
 
 	var m base.Manifest
 	var operations, round uint64
-	var confirmed, proposer string
+	var confirmed, proposer, digested string
 	if err := st.database.Client().GetByFilter(
 		defaultColNameBlock,
 		q,
 		func(res *mongo.SingleResult) error {
-			v, ops, cfrm, prps, rnd, err := LoadManifest(res.Decode, st.database.Encoders())
+			v, ops, cfrm, prps, rnd, dgst, err := LoadManifest(res.Decode, st.database.Encoders())
 			if err != nil {
 				return err
 			}
@@ -777,30 +777,31 @@ func (st *Database) ManifestByHeight(height base.Height) (base.Manifest, uint64,
 			confirmed = cfrm
 			proposer = prps
 			round = rnd
+			digested = dgst
 			return nil
 		},
 	); err != nil {
-		return nil, 0, "", "", 0, mitumutil.ErrNotFound.WithMessage(err, "block manifest")
+		return nil, 0, "", "", 0, "", mitumutil.ErrNotFound.WithMessage(err, "block manifest")
 	}
 
 	if m != nil {
-		return m, operations, confirmed, proposer, round, nil
+		return m, operations, confirmed, proposer, round, digested, nil
 	} else {
-		return nil, 0, "", "", 0, mitumutil.ErrNotFound.Wrap(errors.Errorf("block manifest"))
+		return nil, 0, "", "", 0, "", mitumutil.ErrNotFound.Wrap(errors.Errorf("block manifest"))
 	}
 }
 
-func (st *Database) ManifestByHash(hash mitumutil.Hash) (base.Manifest, uint64, string, string, uint64, error) {
+func (st *Database) ManifestByHash(hash mitumutil.Hash) (base.Manifest, uint64, string, string, uint64, string, error) {
 	q := util.NewBSONFilter("block", hash).D()
 
 	var m base.Manifest
 	var operations, round uint64
-	var confirmed, proposer string
+	var confirmed, proposer, digested string
 	if err := st.database.Client().GetByFilter(
 		defaultColNameBlock,
 		q,
 		func(res *mongo.SingleResult) error {
-			v, ops, cfrm, prps, rnd, err := LoadManifest(res.Decode, st.database.Encoders())
+			v, ops, cfrm, prps, rnd, dgst, err := LoadManifest(res.Decode, st.database.Encoders())
 			if err != nil {
 				return err
 			}
@@ -809,16 +810,17 @@ func (st *Database) ManifestByHash(hash mitumutil.Hash) (base.Manifest, uint64, 
 			confirmed = cfrm
 			proposer = prps
 			round = rnd
+			digested = dgst
 			return nil
 		},
 	); err != nil {
-		return nil, 0, "", "", 0, mitumutil.ErrNotFound.WithMessage(err, "block manifest")
+		return nil, 0, "", "", 0, "", mitumutil.ErrNotFound.WithMessage(err, "block manifest")
 	}
 
 	if m != nil {
-		return m, operations, confirmed, proposer, round, nil
+		return m, operations, confirmed, proposer, round, digested, nil
 	} else {
-		return nil, 0, "", "", 0, mitumutil.ErrNotFound.Errorf("block manifest")
+		return nil, 0, "", "", 0, "", mitumutil.ErrNotFound.Errorf("block manifest")
 	}
 }
 

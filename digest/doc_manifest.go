@@ -1,6 +1,7 @@
 package digest
 
 import (
+	"github.com/ProtoconNet/mitum2/util/localtime"
 	"time"
 
 	mongodbstorage "github.com/ProtoconNet/mitum-currency/v3/digest/mongodb"
@@ -17,6 +18,7 @@ type ManifestDoc struct {
 	confirmedAt time.Time
 	proposer    base.Address
 	round       base.Round
+	digestedAt  time.Time
 }
 
 func NewManifestDoc(
@@ -33,6 +35,7 @@ func NewManifestDoc(
 		return ManifestDoc{}, err
 	}
 
+	now := localtime.Now().UTC()
 	return ManifestDoc{
 		BaseDoc:     b,
 		va:          manifest,
@@ -41,6 +44,7 @@ func NewManifestDoc(
 		confirmedAt: confirmedAt,
 		proposer:    proposer,
 		round:       round,
+		digestedAt:  now,
 	}, nil
 }
 
@@ -56,6 +60,7 @@ func (doc ManifestDoc) MarshalBSON() ([]byte, error) {
 	m["confirmed_at"] = doc.confirmedAt.String()
 	m["proposer"] = doc.proposer.String()
 	m["round"] = doc.round.Uint64()
+	m["digested_at"] = doc.digestedAt.String()
 
 	return bsonenc.Marshal(m)
 }
