@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"math/big"
 	"strings"
 
@@ -95,8 +96,8 @@ func (k MEPublickey) Equal(b base.PKKey) bool {
 }
 
 func (k MEPublickey) Verify(input []byte, sig base.Signature) error {
-	if len(sig) < 4 {
-		return base.ErrSignatureVerification.WithStack()
+	if len(sig) != 68 {
+		return common.ErrSignInvalid.Wrap(base.ErrSignatureVerification.WithStack())
 	}
 
 	rlength := int(binary.LittleEndian.Uint32(sig[:4]))
