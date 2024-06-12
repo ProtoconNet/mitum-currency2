@@ -14,36 +14,36 @@ var (
 
 type CurrencyDesign struct {
 	hint.BaseHinter
-	amount         Amount
+	initialSupply  Amount
 	genesisAccount base.Address
 	policy         CurrencyPolicy
-	aggregate      common.Big
+	totalSupply    common.Big
 }
 
 func NewCurrencyDesign(amount Amount, genesisAccount base.Address, po CurrencyPolicy) CurrencyDesign {
 	return CurrencyDesign{
 		BaseHinter:     hint.NewBaseHinter(CurrencyDesignHint),
-		amount:         amount,
+		initialSupply:  amount,
 		genesisAccount: genesisAccount,
 		policy:         po,
-		aggregate:      amount.Big(),
+		totalSupply:    amount.Big(),
 	}
 }
 
 func (de CurrencyDesign) IsValid([]byte) error {
 	if err := util.CheckIsValiders(nil, false,
 		de.BaseHinter,
-		de.amount,
-		de.aggregate,
+		de.initialSupply,
+		de.totalSupply,
 	); err != nil {
 		return util.ErrInvalid.Errorf("Invalid currency balance, %v", err)
 	}
 
 	switch {
-	case !de.amount.Big().OverZero():
+	case !de.initialSupply.Big().OverZero():
 		return util.ErrInvalid.Errorf("Currency balance should be over zero")
-	case !de.aggregate.OverZero():
-		return util.ErrInvalid.Errorf("Aggregate should be over zero")
+	case !de.totalSupply.OverZero():
+		return util.ErrInvalid.Errorf("TotalSupply should be over zero")
 	}
 
 	if de.genesisAccount != nil {
@@ -66,10 +66,10 @@ func (de CurrencyDesign) Bytes() []byte {
 	}
 
 	return util.ConcatBytesSlice(
-		de.amount.Bytes(),
+		de.initialSupply.Bytes(),
 		gb,
 		de.policy.Bytes(),
-		de.aggregate.Bytes(),
+		de.totalSupply.Bytes(),
 	)
 }
 
@@ -77,12 +77,12 @@ func (de CurrencyDesign) GenesisAccount() base.Address {
 	return de.genesisAccount
 }
 
-func (de CurrencyDesign) Amount() Amount {
-	return de.amount
+func (de CurrencyDesign) InitialSupply() Amount {
+	return de.initialSupply
 }
 
 func (de CurrencyDesign) Currency() CurrencyID {
-	return de.amount.cid
+	return de.initialSupply.cid
 }
 
 func (de CurrencyDesign) Policy() CurrencyPolicy {
@@ -97,16 +97,16 @@ func (de *CurrencyDesign) SetPolicy(po CurrencyPolicy) {
 	de.policy = po
 }
 
-func (de CurrencyDesign) Aggregate() common.Big {
-	return de.aggregate
+func (de CurrencyDesign) TotalSupply() common.Big {
+	return de.totalSupply
 }
 
-func (de CurrencyDesign) AddAggregate(b common.Big) (CurrencyDesign, error) {
+func (de CurrencyDesign) AddTotalSupply(b common.Big) (CurrencyDesign, error) {
 	if !b.OverZero() {
-		return de, errors.Errorf("New aggregate not over zero")
+		return de, errors.Errorf("amount to add to total supply must be greater than zero")
 	}
 
-	de.aggregate = de.aggregate.Add(b)
+	de.totalSupply = de.totalSupply.Add(b)
 
 	return de, nil
 }

@@ -31,7 +31,7 @@ var (
 var (
 	HandlerPathNodeInfo                   = `/`
 	HandlerPathCurrencies                 = `/currency`
-	HandlerPathCurrency                   = `/currency/{currencyid:.*}`
+	HandlerPathCurrency                   = `/currency/{currency_id:.*}`
 	HandlerPathManifests                  = `/block/manifests`
 	HandlerPathOperations                 = `/block/operations`
 	HandlerPathOperation                  = `/block/operation/{hash:(?i)[0-9a-z][0-9a-z]+}`

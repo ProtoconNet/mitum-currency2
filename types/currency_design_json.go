@@ -10,28 +10,28 @@ import (
 
 type CurrencyDesignJSONMarshaler struct {
 	hint.BaseHinter
-	Amount    Amount         `json:"amount"`
-	Genesis   base.Address   `json:"genesis_account"`
-	Policy    CurrencyPolicy `json:"policy"`
-	Aggregate string         `json:"aggregate"`
+	InitialSupply Amount         `json:"initial_supply"`
+	Genesis       base.Address   `json:"genesis_account"`
+	Policy        CurrencyPolicy `json:"policy"`
+	TotalSupply   string         `json:"total_supply"`
 }
 
 func (de CurrencyDesign) MarshalJSON() ([]byte, error) {
 	return util.MarshalJSON(CurrencyDesignJSONMarshaler{
-		BaseHinter: de.BaseHinter,
-		Amount:     de.amount,
-		Genesis:    de.genesisAccount,
-		Policy:     de.policy,
-		Aggregate:  de.aggregate.String(),
+		BaseHinter:    de.BaseHinter,
+		InitialSupply: de.initialSupply,
+		Genesis:       de.genesisAccount,
+		Policy:        de.policy,
+		TotalSupply:   de.totalSupply.String(),
 	})
 }
 
 type CurrencyDesignJSONUnmarshaler struct {
-	Hint      hint.Hint       `json:"_hint"`
-	Amount    json.RawMessage `json:"amount"`
-	Genesis   string          `json:"genesis_account"`
-	Policy    json.RawMessage `json:"policy"`
-	Aggregate string          `json:"aggregate"`
+	Hint          hint.Hint       `json:"_hint"`
+	InitialSupply json.RawMessage `json:"initial_supply"`
+	Genesis       string          `json:"genesis_account"`
+	Policy        json.RawMessage `json:"policy"`
+	TotalSupply   string          `json:"total_supply"`
 }
 
 func (de *CurrencyDesign) DecodeJSON(b []byte, enc encoder.Encoder) error {
@@ -42,5 +42,5 @@ func (de *CurrencyDesign) DecodeJSON(b []byte, enc encoder.Encoder) error {
 		return e.Wrap(err)
 	}
 
-	return de.unpack(enc, ude.Hint, ude.Amount, ude.Genesis, ude.Policy, ude.Aggregate)
+	return de.unpack(enc, ude.Hint, ude.InitialSupply, ude.Genesis, ude.Policy, ude.TotalSupply)
 }

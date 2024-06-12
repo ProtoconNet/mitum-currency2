@@ -8,15 +8,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (de *CurrencyDesign) unpack(enc encoder.Encoder, ht hint.Hint, bam []byte, ga string, bpo []byte, ag string) error {
+func (de *CurrencyDesign) unpack(enc encoder.Encoder, ht hint.Hint, bis []byte, ga string, bpo []byte, ts string) error {
 	de.BaseHinter = hint.NewBaseHinter(ht)
 
-	var am Amount
-	if err := encoder.Decode(enc, bam, &am); err != nil {
+	var initialSupply Amount
+	if err := encoder.Decode(enc, bis, &initialSupply); err != nil {
 		return errors.Errorf("Decode amount, %v", err)
 	}
 
-	de.amount = am
+	de.initialSupply = initialSupply
 
 	switch ad, err := base.DecodeAddress(ga, enc); {
 	case err != nil:
@@ -33,10 +33,10 @@ func (de *CurrencyDesign) unpack(enc encoder.Encoder, ht hint.Hint, bam []byte, 
 
 	de.policy = policy
 
-	if big, err := common.NewBigFromString(ag); err != nil {
+	if big, err := common.NewBigFromString(ts); err != nil {
 		return err
 	} else {
-		de.aggregate = big
+		de.totalSupply = big
 	}
 
 	return nil
