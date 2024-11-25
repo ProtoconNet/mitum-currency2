@@ -189,6 +189,12 @@ func (hd *Handlers) setHandlers() {
 		Methods(http.MethodOptions, "GET")
 	_ = hd.setHandler(HandlerPathAccounts, hd.handleAccounts, true, get, get).
 		Methods(http.MethodOptions, "GET")
+	_ = hd.setHandler(HandlerPathDIDData, hd.handleDIDData, true, get, get).
+		Methods(http.MethodOptions, "GET")
+	_ = hd.setHandler(HandlerPathDIDDesign, hd.handleDIDDesign, true, get, get).
+		Methods(http.MethodOptions, "GET")
+	_ = hd.setHandler(HandlerPathDIDDocument, hd.handleDIDDocument, true, get, get).
+		Methods(http.MethodOptions, "GET")
 	// _ = hd.setHandler(HandlerPathOperationBuildFactTemplate, hd.handleOperationBuildFactTemplate, true).
 	// 	Methods(http.MethodOptions, "GET")
 	// _ = hd.setHandler(HandlerPathOperationBuildFact, hd.handleOperationBuildFact, false).

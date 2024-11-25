@@ -108,6 +108,7 @@ func (k MEPublickey) Verify(input []byte, sig base.Signature) error {
 	if (4 + rlength) > len(sig) {
 		return common.ErrValueInvalid.Wrap(base.ErrSignatureVerification.WithStack())
 	}
+
 	r := big.NewInt(0).SetBytes(sig[4 : 4+rlength])
 	s := big.NewInt(0).SetBytes(sig[4+rlength:])
 

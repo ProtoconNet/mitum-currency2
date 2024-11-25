@@ -74,9 +74,44 @@ var operationIndexModels = []mongo.IndexModel{
 	},
 }
 
+var didRegistryIndexModels = []mongo.IndexModel{
+	{
+		Keys: bson.D{
+			bson.E{Key: "contract", Value: 1},
+			bson.E{Key: "height", Value: -1}},
+		Options: options.Index().
+			SetName(indexPrefix + "did_registry_contract_height"),
+	},
+}
+
+var didRegistryDataIndexModels = []mongo.IndexModel{
+	{
+		Keys: bson.D{
+			bson.E{Key: "contract", Value: 1},
+			bson.E{Key: "method_specific_id", Value: 1},
+			bson.E{Key: "height", Value: -1}},
+		Options: options.Index().
+			SetName(indexPrefix + "did_registry_data_contract_publicKey_height"),
+	},
+}
+
+var didRegistryDocumentIndexModels = []mongo.IndexModel{
+	{
+		Keys: bson.D{
+			bson.E{Key: "contract", Value: 1},
+			bson.E{Key: "did", Value: 1},
+			bson.E{Key: "height", Value: -1}},
+		Options: options.Index().
+			SetName(indexPrefix + "did_registry_document_contract_did_height"),
+	},
+}
+
 var DefaultIndexes = map[string] /* collection */ []mongo.IndexModel{
-	defaultColNameBlock:     blockIndexModels,
-	defaultColNameAccount:   accountIndexModels,
-	defaultColNameBalance:   balanceIndexModels,
-	defaultColNameOperation: operationIndexModels,
+	defaultColNameBlock:       blockIndexModels,
+	defaultColNameAccount:     accountIndexModels,
+	defaultColNameBalance:     balanceIndexModels,
+	defaultColNameOperation:   operationIndexModels,
+	defaultColNameDIDRegistry: didRegistryIndexModels,
+	defaultColNameDIDData:     didRegistryDataIndexModels,
+	defaultColNameDIDDocument: didRegistryDocumentIndexModels,
 }
