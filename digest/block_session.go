@@ -44,6 +44,9 @@ type BlockSession struct {
 	contractAccountModels []mongo.WriteModel
 	balanceModels         []mongo.WriteModel
 	currencyModels        []mongo.WriteModel
+	didRegistryModels     []mongo.WriteModel
+	didDataModels         []mongo.WriteModel
+	didDocumentModels     []mongo.WriteModel
 	statesValue           *sync.Map
 	balanceAddressList    []string
 	buildinfo             string
@@ -91,6 +94,10 @@ func (bs *BlockSession) Prepare() error {
 		return err
 	}
 
+	if err := bs.prepareDIDRegistry(); err != nil {
+		return err
+	}
+
 	return bs.prepareAccounts()
 }
 
@@ -135,6 +142,24 @@ func (bs *BlockSession) Commit(ctx context.Context) error {
 
 		if len(bs.balanceModels) > 0 {
 			if err := bs.writeModels(txnCtx, defaultColNameBalance, bs.balanceModels); err != nil {
+				return nil, err
+			}
+		}
+
+		if len(bs.didRegistryModels) > 0 {
+			if err := bs.writeModels(txnCtx, defaultColNameDIDRegistry, bs.didRegistryModels); err != nil {
+				return nil, err
+			}
+		}
+
+		if len(bs.didDataModels) > 0 {
+			if err := bs.writeModels(txnCtx, defaultColNameDIDData, bs.didDataModels); err != nil {
+				return nil, err
+			}
+		}
+
+		if len(bs.didDocumentModels) > 0 {
+			if err := bs.writeModels(txnCtx, defaultColNameDIDDocument, bs.didDocumentModels); err != nil {
 				return nil, err
 			}
 		}
@@ -398,10 +423,19 @@ func (bs *BlockSession) writeModelsChunk(ctx context.Context, col string, models
 
 func (bs *BlockSession) close() error {
 	bs.block = nil
+	bs.ops = nil
+	bs.opsTree = fixedtree.EmptyTree()
+	bs.sts = nil
+	bs.proposal = nil
+	bs.opsTreeNodes = nil
+	bs.blockModels = nil
 	bs.operationModels = nil
 	bs.currencyModels = nil
 	bs.accountModels = nil
 	bs.contractAccountModels = nil
+	bs.didRegistryModels = nil
+	bs.didDataModels = nil
+	bs.didDocumentModels = nil
 	bs.balanceModels = nil
 
 	return bs.st.Close()

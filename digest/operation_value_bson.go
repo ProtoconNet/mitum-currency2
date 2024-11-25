@@ -22,12 +22,26 @@ func (va OperationValue) MarshalBSON() ([]byte, error) {
 		})
 	}
 
-	op := map[string]interface{}{
-		"_hint": va.op.Hint().String(),
-		"hash":  va.op.Hash().String(),
-		"fact":  va.op.Fact(),
-		"signs": signs,
+	var op = make(map[string]interface{})
+	switch k := va.op.(type) {
+	case common.IExtendedOperation:
+		op = map[string]interface{}{
+			"_hint":          va.op.Hint().String(),
+			"hash":           va.op.Hash().String(),
+			"fact":           va.op.Fact(),
+			"signs":          signs,
+			"authentication": k.GetAuthentication(),
+			"settlement":     k.GetSettlement(),
+		}
+	default:
+		op = map[string]interface{}{
+			"_hint": va.op.Hint().String(),
+			"hash":  va.op.Hash().String(),
+			"fact":  va.op.Fact(),
+			"signs": signs,
+		}
 	}
+
 	return bsonenc.Marshal(
 		bson.M{
 			"_hint":        va.Hint().String(),

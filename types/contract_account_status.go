@@ -15,9 +15,10 @@ var ContractAccountStatusHint = hint.MustNewHint("mitum-currency-contract-accoun
 
 type ContractAccountStatus struct {
 	hint.BaseHinter
-	owner    base.Address
-	isActive bool
-	handlers []base.Address
+	owner      base.Address
+	isActive   bool
+	handlers   []base.Address
+	recipients []base.Address
 }
 
 func NewContractAccountStatus(owner base.Address, handlers []base.Address) ContractAccountStatus {
@@ -105,6 +106,36 @@ func (cs *ContractAccountStatus) SetHandlers(handlers []base.Address) error {
 func (cs ContractAccountStatus) IsHandler(ad base.Address) bool { // nolint:revive
 	for i := range cs.Handlers() {
 		if ad.Equal(cs.Handlers()[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+func (cs ContractAccountStatus) Recipients() []base.Address { // nolint:revive
+	return cs.recipients
+}
+
+func (cs *ContractAccountStatus) SetRecipients(recipients []base.Address) error {
+	sort.Slice(recipients, func(i, j int) bool {
+		return bytes.Compare(recipients[i].Bytes(), recipients[j].Bytes()) < 0
+	})
+
+	for i := range recipients {
+		err := recipients[i].IsValid(nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	cs.recipients = recipients
+
+	return nil
+}
+
+func (cs ContractAccountStatus) IsRecipients(ad base.Address) bool { // nolint:revive
+	for i := range cs.Recipients() {
+		if ad.Equal(cs.Recipients()[i]) {
 			return true
 		}
 	}
