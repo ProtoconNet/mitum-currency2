@@ -6,6 +6,7 @@ import (
 	"github.com/ProtoconNet/mitum2/util/encoder"
 	"github.com/ProtoconNet/mitum2/util/hint"
 	"github.com/ProtoconNet/mitum2/util/valuehash"
+	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"time"
 )
@@ -22,13 +23,106 @@ type BaseSignBSONUnmarshaler struct {
 }
 
 type BaseOperationBSONUnmarshaler struct {
+	Authentication bson.Raw `bson:"authentication"`
+	Settlement     bson.Raw `bson:"settlement"`
+}
+
+func (op BaseOperation) MarshalBSON() ([]byte, error) {
+	var signs bson.A
+
+	for i := range op.signs {
+		signs = append(signs, bson.M{
+			"signer":    op.signs[i].Signer().String(),
+			"signature": op.signs[i].Signature().String(),
+			"signed_at": op.signs[i].SignedAt(),
+		})
+	}
+
+	return bsonenc.Marshal(
+		bson.M{
+			"_hint":          op.Hint().String(),
+			"hash":           op.Hash().String(),
+			"fact":           op.Fact(),
+			"signs":          signs,
+			"authentication": op.Authentication,
+			"settlement":     op.Settlement,
+		})
+}
+
+func (op *BaseOperation) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
+	var mbo MBaseOperation
+	err := mbo.DecodeBSON(b, enc)
+	if err != nil {
+		return DecorateError(err, ErrDecodeBson, *op)
+	}
+
+	op.MBaseOperation = mbo
+	var u BaseOperationBSONUnmarshaler
+	err = enc.Unmarshal(b, &u)
+	if err != nil {
+		return DecorateError(err, ErrDecodeBson, *op)
+	}
+
+	var ba BaseAuthentication
+	err = ba.DecodeBSON(u.Authentication, enc)
+	if err != nil {
+		return DecorateError(err, ErrDecodeBson, *op)
+	}
+	op.SetAuthentication(ba)
+
+	var bs BaseSettlement
+	err = bs.DecodeBSON(u.Settlement, enc)
+	if err != nil {
+		return DecorateError(err, ErrDecodeBson, *op)
+	}
+	op.SetSettlement(bs)
+
+	return nil
+}
+
+type ExtendedOperationBSONUnmarshaler struct {
+	Authentication bson.Raw `bson:"authentication"`
+	Settlement     bson.Raw `bson:"settlement"`
+}
+
+func (op *ExtendedOperation) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
+	var u ExtendedOperationBSONUnmarshaler
+	err := enc.Unmarshal(b, u)
+	if err != nil {
+		return DecorateError(err, ErrDecodeBson, *op)
+	}
+
+	h, err := enc.Decode(u.Authentication)
+	if err != nil {
+		return DecorateError(err, ErrDecodeBson, *op)
+	}
+	ba, ok := h.(BaseAuthentication)
+	if !ok {
+		return DecorateError(errors.Errorf("expected BaseAuthentication, but %T", h), ErrDecodeBson, *op)
+	}
+	op.SetAuthentication(ba)
+
+	h, err = enc.Decode(u.Settlement)
+	if err != nil {
+		return DecorateError(err, ErrDecodeBson, *op)
+	}
+	bs, ok := h.(BaseSettlement)
+	if !ok {
+		return DecorateError(errors.Errorf("expected BaseSettlement, but %T", h), ErrDecodeBson, *op)
+	}
+	op.SetSettlement(bs)
+
+	return nil
+}
+
+type MBaseOperationBSONUnmarshaler struct {
 	Hint  string     `bson:"_hint"`
 	Hash  string     `bson:"hash"`
 	Fact  bson.Raw   `bson:"fact"`
 	Signs []bson.Raw `bson:"signs"`
 }
 
-func (op BaseOperation) MarshalBSON() ([]byte, error) {
+func (op MBaseOperation) MarshalBSON() ([]byte, error) {
 	var signs bson.A
 
 	for i := range op.signs {
@@ -49,8 +143,8 @@ func (op BaseOperation) MarshalBSON() ([]byte, error) {
 	)
 }
 
-func (op *BaseOperation) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
-	var u BaseOperationBSONUnmarshaler
+func (op *MBaseOperation) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
+	var u MBaseOperationBSONUnmarshaler
 
 	if err := enc.Unmarshal(b, &u); err != nil {
 		return DecorateError(err, ErrDecodeBson, *op)
@@ -94,7 +188,7 @@ func (op *BaseOperation) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 }
 
 func (op *BaseNodeOperation) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
-	var u BaseOperationBSONUnmarshaler
+	var u MBaseOperationBSONUnmarshaler
 
 	if err := enc.Unmarshal(b, &u); err != nil {
 		return DecorateError(err, ErrDecodeBson, *op)
@@ -105,15 +199,15 @@ func (op *BaseNodeOperation) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 		return DecorateError(err, ErrDecodeBson, *op)
 	}
 
-	op.BaseOperation.BaseHinter = hint.NewBaseHinter(ht)
-	op.BaseOperation.h = valuehash.NewBytesFromString(u.Hash)
+	op.MBaseOperation.BaseHinter = hint.NewBaseHinter(ht)
+	op.MBaseOperation.h = valuehash.NewBytesFromString(u.Hash)
 
 	var fact base.Fact
 	if err := encoder.Decode(enc, u.Fact, &fact); err != nil {
 		return DecorateError(err, ErrDecodeBson, *op)
 	}
 
-	op.BaseOperation.SetFact(fact)
+	op.MBaseOperation.SetFact(fact)
 
 	return nil
 }
