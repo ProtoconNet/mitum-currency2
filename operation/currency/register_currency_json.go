@@ -42,11 +42,11 @@ func (fact *RegisterCurrencyFact) DecodeJSON(b []byte, enc encoder.Encoder) erro
 	return nil
 }
 
-func (op RegisterCurrency) MarshalJSON() ([]byte, error) {
-	return util.MarshalJSON(BaseOperationMarshaler{
-		BaseOperationJSONMarshaler: op.BaseOperation.JSONMarshaler(),
-	})
-}
+//func (op RegisterCurrency) MarshalJSON() ([]byte, error) {
+//	return util.MarshalJSON(BaseOperationMarshaler{
+//		MBaseOperationJSONMarshaler: op.MBaseOperation.JSONMarshaler(),
+//	})
+//}
 
 func (op *RegisterCurrency) DecodeJSON(b []byte, enc encoder.Encoder) error {
 	var ubo common.BaseNodeOperation

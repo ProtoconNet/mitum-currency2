@@ -57,7 +57,7 @@ func (fact *SuffrageCandidateFact) DecodeBSON(b []byte, enc *bsonenc.Encoder) er
 }
 
 func (op SuffrageCandidate) MarshalBSON() ([]byte, error) {
-	return bsonenc.Marshal(op.BaseOperation)
+	return bsonenc.Marshal(op.MBaseOperation)
 }
 
 func (op *SuffrageCandidate) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {

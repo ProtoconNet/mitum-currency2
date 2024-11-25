@@ -5,9 +5,11 @@ import (
 	"github.com/ProtoconNet/mitum-currency/v3/digest"
 	digestisaac "github.com/ProtoconNet/mitum-currency/v3/digest/isaac"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/did-registry"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
 	isaacoperation "github.com/ProtoconNet/mitum-currency/v3/operation/isaac"
 	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
+	statedid "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
 	stateextension "github.com/ProtoconNet/mitum-currency/v3/state/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
@@ -61,6 +63,7 @@ var AddedHinters = []encoder.DecodeDetail{
 	{Hint: extension.CreateContractAccountItemMultiAmountsHint, Instance: extension.CreateContractAccountItemMultiAmounts{}},
 	{Hint: extension.CreateContractAccountItemSingleAmountHint, Instance: extension.CreateContractAccountItemSingleAmount{}},
 	{Hint: extension.UpdateHandlerHint, Instance: extension.UpdateHandler{}},
+	{Hint: extension.UpdateRecipientHint, Instance: extension.UpdateRecipient{}},
 	{Hint: extension.WithdrawHint, Instance: extension.Withdraw{}},
 	{Hint: extension.WithdrawItemMultiAmountsHint, Instance: extension.WithdrawItemMultiAmounts{}},
 	{Hint: extension.WithdrawItemSingleAmountHint, Instance: extension.WithdrawItemSingleAmount{}},
@@ -85,6 +88,22 @@ var AddedHinters = []encoder.DecodeDetail{
 	{Hint: digest.AccountValueHint, Instance: digest.AccountValue{}},
 	{Hint: digest.OperationValueHint, Instance: digest.OperationValue{}},
 	{Hint: digestisaac.ManifestHint, Instance: digestisaac.Manifest{}},
+
+	{Hint: types.DesignHint, Instance: types.Design{}},
+	{Hint: types.DataHint, Instance: types.Data{}},
+	{Hint: types.DIDResourceHint, Instance: types.DIDResource{}},
+	{Hint: types.DIDDocumentHint, Instance: types.DIDDocument{}},
+	{Hint: types.AsymmetricKeyAuthenticationHint, Instance: types.AsymmetricKeyAuthentication{}},
+	{Hint: types.SocialLogInAuthenticationHint, Instance: types.SocialLogInAuthentication{}},
+
+	{Hint: did_registry.CreateDIDHint, Instance: did_registry.CreateDID{}},
+	{Hint: did_registry.ReactivateDIDHint, Instance: did_registry.ReactivateDID{}},
+	{Hint: did_registry.DeactivateDIDHint, Instance: did_registry.DeactivateDID{}},
+	{Hint: did_registry.UpdateDIDDocumentHint, Instance: did_registry.UpdateDIDDocument{}},
+	{Hint: did_registry.RegisterModelHint, Instance: did_registry.RegisterModel{}},
+	{Hint: statedid.DataStateValueHint, Instance: statedid.DataStateValue{}},
+	{Hint: statedid.DesignStateValueHint, Instance: statedid.DesignStateValue{}},
+	{Hint: statedid.DocumentStateValueHint, Instance: statedid.DocumentStateValue{}},
 }
 
 var AddedSupportedHinters = []encoder.DecodeDetail{
@@ -97,6 +116,7 @@ var AddedSupportedHinters = []encoder.DecodeDetail{
 
 	{Hint: extension.CreateContractAccountFactHint, Instance: extension.CreateContractAccountFact{}},
 	{Hint: extension.UpdateHandlerFactHint, Instance: extension.UpdateHandlerFact{}},
+	{Hint: extension.UpdateRecipientFactHint, Instance: extension.UpdateRecipientFact{}},
 	{Hint: extension.WithdrawFactHint, Instance: extension.WithdrawFact{}},
 
 	{Hint: isaacoperation.GenesisNetworkPolicyFactHint, Instance: isaacoperation.GenesisNetworkPolicyFact{}},
@@ -105,6 +125,12 @@ var AddedSupportedHinters = []encoder.DecodeDetail{
 	{Hint: isaacoperation.SuffrageGenesisJoinFactHint, Instance: isaacoperation.SuffrageGenesisJoinFact{}},
 	{Hint: isaacoperation.SuffrageJoinFactHint, Instance: isaacoperation.SuffrageJoinFact{}},
 	{Hint: isaacoperation.NetworkPolicyFactHint, Instance: isaacoperation.NetworkPolicyFact{}},
+
+	{Hint: did_registry.CreateDIDFactHint, Instance: did_registry.CreateDIDFact{}},
+	{Hint: did_registry.ReactivateDIDFactHint, Instance: did_registry.ReactivateDIDFact{}},
+	{Hint: did_registry.UpdateDIDDocumentFactHint, Instance: did_registry.UpdateDIDDocumentFact{}},
+	{Hint: did_registry.DeactivateDIDFactHint, Instance: did_registry.DeactivateDIDFact{}},
+	{Hint: did_registry.RegisterModelFactHint, Instance: did_registry.RegisterModelFact{}},
 }
 
 func init() {

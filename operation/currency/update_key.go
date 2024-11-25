@@ -99,6 +99,13 @@ func (fact UpdateKeyFact) Rebuild() UpdateKeyFact {
 	return fact
 }
 
+func (fact UpdateKeyFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+	required := make(map[types.CurrencyID][]common.Big)
+	required[fact.Currency()] = []common.Big{common.ZeroBig}
+
+	return required, fact.Sender()
+}
+
 type UpdateKey struct {
 	common.BaseOperation
 }

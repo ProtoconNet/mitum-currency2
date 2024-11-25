@@ -8,5 +8,6 @@ type CurrencyCommand struct {
 	UpdateCurrency        UpdateCurrencyCommand        `cmd:"" name:"update-currency" help:"update currency policy"`
 	CreateContractAccount CreateContractAccountCommand `cmd:"" name:"create-contract-account" help:"create new contract account"`
 	UpdateHandler         UpdateHandlerCommand         `cmd:"" name:"update-handler" help:"update handler of contract account"`
+	UpdateRecipient       UpdateRecipientCommand       `cmd:"" name:"update-recipient" help:"update recipient of contract account"`
 	Withdraw              WithdrawCommand              `cmd:"" name:"withdraw" help:"withdraw amounts from target contract account"`
 }

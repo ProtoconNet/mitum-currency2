@@ -31,6 +31,7 @@ var CLI struct { //nolint:govet //...
 	Operation struct {
 		Currency cmds.CurrencyCommand `cmd:"" help:"currency operation"`
 		Suffrage cmds.SuffrageCommand `cmd:"" help:"suffrage operation"`
+		DID      cmds.DIDCommand      `cmd:"" help:"did-registry operation"`
 	} `cmd:"" help:"create operation"`
 	Network struct {
 		Client cmds.NetworkClientCommand `cmd:"" help:"network client"`

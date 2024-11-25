@@ -3,6 +3,7 @@ package extension
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
+	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/ProtoconNet/mitum2/util/hint"
@@ -141,6 +142,34 @@ func (fact WithdrawFact) Addresses() ([]base.Address, error) {
 	return as, nil
 }
 
+func (fact WithdrawFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+	required := make(map[types.CurrencyID][]common.Big)
+	items := make([]currency.AmountsItem, len(fact.items))
+	for i := range fact.items {
+		items[i] = fact.items[i]
+	}
+
+	for i := range items {
+		it := items[i]
+		amounts := it.Amounts()
+		for j := range amounts {
+			am := amounts[j]
+			cid := am.Currency()
+			big := am.Big()
+			var k []common.Big
+			if arr, found := required[cid]; found {
+				arr = append(arr, big)
+				copy(k, arr)
+			} else {
+				k = append(k, big)
+			}
+			required[cid] = k
+		}
+	}
+
+	return required, fact.Sender()
+}
+
 type Withdraw struct {
 	common.BaseOperation
 }
@@ -154,5 +183,6 @@ func (op *Withdraw) HashSign(priv base.Privatekey, networkID base.NetworkID) err
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

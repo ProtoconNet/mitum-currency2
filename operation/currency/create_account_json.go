@@ -2,7 +2,6 @@ package currency
 
 import (
 	"encoding/json"
-
 	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -48,7 +47,9 @@ type BaseOperationMarshaler struct {
 }
 
 func (op CreateAccount) MarshalJSON() ([]byte, error) {
-	return util.MarshalJSON(BaseOperationMarshaler{
+	return util.MarshalJSON(struct {
+		common.BaseOperationJSONMarshaler
+	}{
 		BaseOperationJSONMarshaler: op.BaseOperation.JSONMarshaler(),
 	})
 }

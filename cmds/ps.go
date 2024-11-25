@@ -3,6 +3,7 @@ package cmds
 import (
 	"context"
 	"github.com/ProtoconNet/mitum-currency/v3/digest"
+	did "github.com/ProtoconNet/mitum-currency/v3/operation/did-registry"
 	"os"
 	"path/filepath"
 
@@ -101,8 +102,38 @@ func POperationProcessorsMap(pctx context.Context) (context.Context, error) {
 	); err != nil {
 		return pctx, err
 	} else if err := opr.SetProcessor(
+		extension.UpdateRecipientHint,
+		extension.NewUpdateRecipientProcessor(),
+	); err != nil {
+		return pctx, err
+	} else if err := opr.SetProcessor(
 		extension.WithdrawHint,
 		extension.NewWithdrawProcessor(),
+	); err != nil {
+		return pctx, err
+	} else if err := opr.SetProcessor(
+		did.RegisterModelHint,
+		did.NewRegisterModelProcessor(),
+	); err != nil {
+		return pctx, err
+	} else if err := opr.SetProcessor(
+		did.CreateDIDHint,
+		did.NewCreateDIDProcessor(),
+	); err != nil {
+		return pctx, err
+	} else if err := opr.SetProcessor(
+		did.ReactivateDIDHint,
+		did.NewReactivateDIDProcessor(),
+	); err != nil {
+		return pctx, err
+	} else if err := opr.SetProcessor(
+		did.DeactivateDIDHint,
+		did.NewDeactivateDIDProcessor(),
+	); err != nil {
+		return pctx, err
+	} else if err := opr.SetProcessor(
+		did.UpdateDIDDocumentHint,
+		did.NewUpdateDIDDocumentProcessor(),
 	); err != nil {
 		return pctx, err
 	}
@@ -187,6 +218,16 @@ func POperationProcessorsMap(pctx context.Context) (context.Context, error) {
 			)
 		})
 
+	_ = setA.Add(extension.UpdateRecipientHint,
+		func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
+			return opr.New(
+				height,
+				getStatef,
+				nil,
+				nil,
+			)
+		})
+
 	_ = setA.Add(extension.WithdrawHint,
 		func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
 			return opr.New(
@@ -196,6 +237,51 @@ func POperationProcessorsMap(pctx context.Context) (context.Context, error) {
 				nil,
 			)
 		})
+
+	_ = setA.Add(did.CreateDIDHint, func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
+		return opr.New(
+			height,
+			getStatef,
+			nil,
+			nil,
+		)
+	})
+
+	_ = setA.Add(did.RegisterModelHint, func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
+		return opr.New(
+			height,
+			getStatef,
+			nil,
+			nil,
+		)
+	})
+
+	_ = setA.Add(did.ReactivateDIDHint, func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
+		return opr.New(
+			height,
+			getStatef,
+			nil,
+			nil,
+		)
+	})
+
+	_ = setA.Add(did.DeactivateDIDHint, func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
+		return opr.New(
+			height,
+			getStatef,
+			nil,
+			nil,
+		)
+	})
+
+	_ = setA.Add(did.UpdateDIDDocumentHint, func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
+		return opr.New(
+			height,
+			getStatef,
+			nil,
+			nil,
+		)
+	})
 
 	_ = setA.Add(isaacoperation.SuffrageCandidateHint,
 		func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
