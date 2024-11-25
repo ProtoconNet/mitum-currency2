@@ -133,6 +133,13 @@ func (fact UpdateHandlerFact) Addresses() ([]base.Address, error) {
 	return as, nil
 }
 
+func (fact UpdateHandlerFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+	required := make(map[types.CurrencyID][]common.Big)
+	required[fact.Currency()] = []common.Big{common.ZeroBig}
+
+	return required, fact.Sender()
+}
+
 type UpdateHandler struct {
 	common.BaseOperation
 }

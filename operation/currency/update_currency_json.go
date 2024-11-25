@@ -45,11 +45,11 @@ func (fact *UpdateCurrencyFact) DecodeJSON(b []byte, enc encoder.Encoder) error 
 	return nil
 }
 
-func (op UpdateCurrency) MarshalJSON() ([]byte, error) {
-	return util.MarshalJSON(BaseOperationMarshaler{
-		BaseOperationJSONMarshaler: op.BaseOperation.JSONMarshaler(),
-	})
-}
+//func (op UpdateCurrency) MarshalJSON() ([]byte, error) {
+//	return util.MarshalJSON(BaseOperationMarshaler{
+//		MBaseOperationJSONMarshaler: op.MBaseOperation.JSONMarshaler(),
+//	})
+//}
 
 func (op *UpdateCurrency) DecodeJSON(b []byte, enc encoder.Encoder) error {
 	var ubo common.BaseNodeOperation

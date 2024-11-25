@@ -17,6 +17,10 @@ var (
 
 var MaxCreateAccountItems uint = 100
 
+type FeeBaser interface {
+	FeeBase() (map[types.CurrencyID][]common.Big, base.Address)
+}
+
 type AmountsItem interface {
 	Amounts() []types.Amount
 }
@@ -34,6 +38,7 @@ type CreateAccountItem interface {
 type CreateAccountFact struct {
 	base.BaseFact
 	sender base.Address
+	user   base.Address
 	items  []CreateAccountItem
 }
 
@@ -126,6 +131,10 @@ func (fact CreateAccountFact) Sender() base.Address {
 	return fact.sender
 }
 
+func (fact CreateAccountFact) User() base.Address {
+	return fact.user
+}
+
 func (fact CreateAccountFact) Items() []CreateAccountItem {
 	return fact.items
 }
@@ -168,6 +177,34 @@ func (fact CreateAccountFact) Rebuild() CreateAccountFact {
 	fact.SetHash(fact.Hash())
 
 	return fact
+}
+
+func (fact CreateAccountFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+	required := make(map[types.CurrencyID][]common.Big)
+	items := make([]AmountsItem, len(fact.items))
+	for i := range fact.items {
+		items[i] = fact.items[i]
+	}
+
+	for i := range items {
+		it := items[i]
+		amounts := it.Amounts()
+		for j := range amounts {
+			am := amounts[j]
+			cid := am.Currency()
+			big := am.Big()
+			var k []common.Big
+			if arr, found := required[cid]; found {
+				arr = append(arr, big)
+				copy(k, arr)
+			} else {
+				k = append(k, big)
+			}
+			required[cid] = k
+		}
+	}
+
+	return required, fact.Sender()
 }
 
 type CreateAccount struct {

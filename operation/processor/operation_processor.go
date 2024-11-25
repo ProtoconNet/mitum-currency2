@@ -3,11 +3,17 @@ package processor
 import (
 	"context"
 	"fmt"
+	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/state"
+	didstate "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
+	"github.com/btcsuite/btcutil/base58"
 	"io"
 	"sync"
 
 	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/did-registry"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
+	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 
@@ -27,9 +33,11 @@ var operationProcessorPool = sync.Pool{
 type GetLastBlockFunc func() (base.BlockMap, bool, error)
 
 const (
-	DuplicationTypeSender   types.DuplicationType = "sender"
-	DuplicationTypeCurrency types.DuplicationType = "currency"
-	DuplicationTypeContract types.DuplicationType = "contract"
+	DuplicationTypeSender    types.DuplicationType = "sender"
+	DuplicationTypeCurrency  types.DuplicationType = "currency"
+	DuplicationTypeContract  types.DuplicationType = "contract"
+	DuplicationTypeDID       types.DuplicationType = "did"
+	DuplicationTypeDIDPubKey types.DuplicationType = "didpubkey"
 )
 
 type BaseOperationProcessor interface {
@@ -182,7 +190,7 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 	e := util.StringError("preprocess for OperationProcessor")
 
 	if err := opr.CheckDuplicationFunc(opr, op); err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("duplication found; %w", err), nil
+		return ctx, base.NewBaseOperationProcessReasonError("duplication found; %w", err), nil
 	}
 
 	if opr.processorClosers == nil {
@@ -210,6 +218,132 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 		return ctx, reasonErr, nil
 	}
 
+	switch k := op.(type) {
+	case common.IExtendedOperation:
+		if k.GetAuthentication() != nil && k.GetSettlement() != nil {
+			var authentication types.IAuthentication
+			var doc types.DIDDocument
+			dr, err := types.NewDIDResourceFromString(k.AuthenticationID())
+			if err != nil {
+				return ctx, nil, err
+			}
+
+			if st, err := state.ExistsState(didstate.DocumentStateKey(k.Contract(), dr.DID()), "did document", getStateFunc); err != nil {
+				return ctx, nil, err
+			} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
+				return ctx, nil, err
+			}
+
+			authentication, err = doc.Authentication(k.AuthenticationID())
+			if err != nil {
+				return ctx, base.NewBaseOperationProcessReasonError(
+					common.ErrMPreProcess.Errorf("%v", err)), nil
+			}
+
+			if authentication.Controller() != dr.DID() {
+				return ctx, base.NewBaseOperationProcessReasonError(
+					common.ErrMPreProcess.Errorf(
+						"%v", errors.Errorf(
+							"Controller of authentication id, %v is not matched with DID in document, %v", authentication.Controller(), dr.DID()))), nil
+			}
+
+			switch authentication.AuthType() {
+			case types.AuthTypeECDSASECP:
+				details := authentication.Details()
+				pubKey, ok := details.(base.Publickey)
+				if !ok {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", errors.Errorf("expected PublicKey, but %T", details))), nil
+				}
+
+				signature := base58.Decode(k.ProofData())
+				err := pubKey.Verify(op.Fact().Hash().Bytes(), signature)
+				if err != nil {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", err)), nil
+				}
+
+				payer := k.ProxyPayer()
+				if _, _, aErr, cErr := state.ExistsCAccount(payer, "proxy payer", true, true, getStateFunc); aErr != nil {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", aErr)), nil
+				} else if cErr != nil {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", cErr)), nil
+				}
+			case types.AuthTypeVC:
+				details := authentication.Details()
+				m, ok := details.(map[string]interface{})
+				if !ok {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", errors.Errorf("get authentication details"))), nil
+				}
+				p := m["proof"]
+				proof, ok := p.(types.Proof)
+				if !ok {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", errors.Errorf("get vc proof"))), nil
+				}
+				vm := proof.VerificationMethod()
+				dr, err := types.NewDIDResourceFromString(vm)
+				if err != nil {
+					return ctx, nil, err
+				}
+
+				var doc types.DIDDocument
+				if st, err := state.ExistsState(didstate.DocumentStateKey(k.Contract(), dr.DID()), "did document", getStateFunc); err != nil {
+					return ctx, nil, err
+				} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
+					return ctx, nil, err
+				}
+
+				sAuthentication, err := doc.Authentication(vm)
+				if err != nil {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", err)), nil
+				}
+
+				if sAuthentication.Controller() != dr.DID() {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf(
+							"%v", errors.Errorf(
+								"Controller of authentication id, %v is not matched with DID in document, %v", authentication.Controller(), dr.DID()))), nil
+				}
+
+				if sAuthentication.AuthType() != types.AuthTypeECDSASECP {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", errors.Errorf("auth type must be EcdsaSecp256k1VerificationKey2019"))), nil
+				}
+
+				sDetails := sAuthentication.Details()
+				pubKey, ok := sDetails.(base.Publickey)
+				if !ok {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", errors.Errorf("expected PublicKey, but %T", details))), nil
+				}
+
+				signature := base58.Decode(k.ProofData())
+
+				err = pubKey.Verify(op.Fact().Hash().Bytes(), signature)
+				if err != nil {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("signature verification failed, %v", err)), nil
+				}
+
+				payer := k.ProxyPayer()
+				if _, _, aErr, cErr := state.ExistsCAccount(payer, "proxy payer", true, true, getStateFunc); aErr != nil {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", aErr)), nil
+				} else if cErr != nil {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", cErr)), nil
+				}
+			default:
+			}
+		}
+	default:
+	}
+
 	return ctx, nil, nil
 }
 
@@ -231,6 +365,136 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 	}
 
 	stateMergeValues, reasonErr, err := sp.Process(ctx, op, getStateFunc)
+
+	var isProxyPayer bool
+	switch i := op.Fact().(type) {
+	case currency.FeeBaser:
+		m, payer := i.FeeBase()
+		switch k := op.(type) {
+		case common.IExtendedOperation:
+			if k.GetAuthentication() != nil && k.GetSettlement() != nil {
+				isProxyPayer = true
+				payer = k.ProxyPayer()
+				if _, _, aErr, cErr := state.ExistsCAccount(payer, "proxy payer", true, true, getStateFunc); aErr != nil {
+					return nil, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", aErr)), nil
+				} else if cErr != nil {
+					return nil, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", cErr)), nil
+				}
+			}
+		default:
+		}
+
+		feeReceiveSts := map[types.CurrencyID]base.State{}
+		var sendAmount = make(map[types.CurrencyID]common.Big)
+		var feeRequired = make(map[types.CurrencyID]common.Big)
+		for cid, amounts := range m {
+			policy, err := state.ExistsCurrencyPolicy(cid, getStateFunc)
+			if err != nil {
+				return nil, nil, err
+			}
+			receiver := policy.Feeer().Receiver()
+			if receiver == nil {
+				continue
+			}
+
+			if err := state.CheckExistsState(statecurrency.AccountStateKey(receiver), getStateFunc); err != nil {
+				return nil, nil, errors.Errorf("Feeer receiver account not found, %s", receiver)
+			} else if st, found, err := getStateFunc(statecurrency.BalanceStateKey(receiver, cid)); err != nil {
+				return nil, nil, errors.Errorf("Feeer receiver account not found, %s", receiver)
+			} else if !found {
+				return nil, nil, errors.Errorf("Feeer receiver account not found, %s", receiver)
+			} else {
+				feeReceiveSts[cid] = st
+			}
+
+			total := common.ZeroBig
+			rq := common.ZeroBig
+			for _, big := range amounts {
+				switch k, err := policy.Feeer().Fee(big); {
+				case err != nil:
+					return nil, nil, err
+				default:
+					rq = rq.Add(k)
+				}
+				total = total.Add(big)
+			}
+			if v, found := feeRequired[cid]; !found {
+				feeRequired[cid] = rq
+			} else {
+				feeRequired[cid] = v.Add(rq)
+			}
+			sendAmount[cid] = total
+		}
+
+		for cid, rq := range feeRequired {
+			st, err := state.ExistsState(statecurrency.BalanceStateKey(payer, cid), fmt.Sprintf("balance of fee payer, %v", payer), getStateFunc)
+			if err != nil {
+				return nil, nil, e.Wrap(err)
+			}
+
+			v, ok := st.Value().(statecurrency.BalanceStateValue)
+			if !ok {
+				return nil, base.NewBaseOperationProcessReasonError(
+					"expected %T, not %T",
+					statecurrency.BalanceStateValue{},
+					st.Value(),
+				), nil
+			}
+
+			am, err := statecurrency.StateBalanceValue(st)
+			if err != nil {
+				return nil, nil, e.Wrap(err)
+			}
+
+			if !isProxyPayer {
+				reg := sendAmount[cid].Add(rq)
+				if am.Big().Compare(reg) < 0 {
+					return nil, base.NewBaseOperationProcessReasonError(
+						"account, %s balance insufficient; %d < required %d", payer.String(), am.Big(), rq), nil
+				}
+			} else {
+				if am.Big().Compare(rq) < 0 {
+					return nil, base.NewBaseOperationProcessReasonError(
+						"account, %s balance insufficient; %d < required %d", payer.String(), am.Big(), rq), nil
+				}
+			}
+
+			_, feeReceiverFound := feeReceiveSts[cid]
+			if feeReceiverFound {
+				if st.Key() != feeReceiveSts[cid].Key() {
+					stateMergeValues = append(stateMergeValues, common.NewBaseStateMergeValue(
+						st.Key(),
+						statecurrency.NewDeductBalanceStateValue(v.Amount.WithBig(rq)),
+						func(height base.Height, st base.State) base.StateValueMerger {
+							return statecurrency.NewBalanceStateValueMerger(height, st.Key(), cid, st)
+						},
+					))
+					r, ok := feeReceiveSts[cid].Value().(statecurrency.BalanceStateValue)
+					if !ok {
+						return nil, base.NewBaseOperationProcessReasonError(
+							"expected %T, not %T",
+							statecurrency.BalanceStateValue{},
+							feeReceiveSts[cid].Value(),
+						), nil
+					}
+					stateMergeValues = append(
+						stateMergeValues,
+						common.NewBaseStateMergeValue(
+							feeReceiveSts[cid].Key(),
+							statecurrency.NewAddBalanceStateValue(r.Amount.WithBig(rq)),
+							func(height base.Height, st base.State) base.StateValueMerger {
+								return statecurrency.NewBalanceStateValueMerger(height, feeReceiveSts[cid].Key(), cid, st)
+							},
+						),
+					)
+				}
+			}
+		}
+	default:
+	}
+
 	return stateMergeValues, reasonErr, err
 }
 
@@ -245,6 +509,8 @@ func CheckDuplication(opr *OperationProcessor, op base.Operation) error {
 	var duplicationTypeSenderID string
 	var duplicationTypeCurrencyID string
 	var duplicationTypeContractID string
+	var duplicationTypeDID string
+	var duplicationTypeDIDPubKey []string
 	var newAddresses []base.Address
 
 	switch t := op.(type) {
@@ -302,6 +568,37 @@ func CheckDuplication(opr *OperationProcessor, op base.Operation) error {
 			return errors.Errorf("expected WithdrawFact, not %T", t.Fact())
 		}
 		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
+	case did_registry.RegisterModel:
+		fact, ok := t.Fact().(did_registry.RegisterModelFact)
+		if !ok {
+			return errors.Errorf("expected %T, not %T", did_registry.RegisterModelFact{}, t.Fact())
+		}
+		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
+		duplicationTypeContractID = DuplicationKey(fact.Contract().String(), DuplicationTypeContract)
+	case did_registry.CreateDID:
+		fact, ok := t.Fact().(did_registry.CreateDIDFact)
+		if !ok {
+			return errors.Errorf("expected %T, not %T", did_registry.CreateDIDFact{}, t.Fact())
+		}
+		duplicationTypeDIDPubKey = []string{DuplicationKey(
+			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.Address()), DuplicationTypeDIDPubKey)}
+		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
+	case did_registry.DeactivateDID:
+		fact, ok := t.Fact().(did_registry.DeactivateDIDFact)
+		if !ok {
+			return errors.Errorf("expected %T, not %T", did_registry.DeactivateDIDFact{}, t.Fact())
+		}
+		duplicationTypeDID = DuplicationKey(
+			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.DID()), DuplicationTypeDID)
+		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
+	case did_registry.ReactivateDID:
+		fact, ok := t.Fact().(did_registry.ReactivateDIDFact)
+		if !ok {
+			return errors.Errorf("expected %T, not %T", did_registry.ReactivateDIDFact{}, t.Fact())
+		}
+		duplicationTypeDID = DuplicationKey(
+			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.DID()), DuplicationTypeDID)
+		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
 	default:
 		return nil
 	}
@@ -330,6 +627,27 @@ func CheckDuplication(opr *OperationProcessor, op base.Operation) error {
 				"cannot use a duplicated contract, %v within a proposal",
 				duplicationTypeContractID,
 			)
+		}
+		if len(duplicationTypeDID) > 0 {
+			if _, found := opr.Duplicated[duplicationTypeDID]; found {
+				return errors.Errorf(
+					"cannot use a duplicated contract-did for DID, %v within a proposal",
+					duplicationTypeDID,
+				)
+			}
+
+			opr.Duplicated[duplicationTypeDID] = struct{}{}
+		}
+		if len(duplicationTypeDIDPubKey) > 0 {
+			for _, v := range duplicationTypeDIDPubKey {
+				if _, found := opr.Duplicated[v]; found {
+					return errors.Errorf(
+						"cannot use a duplicated contract-publickey for DID, %v within a proposal",
+						v,
+					)
+				}
+				opr.Duplicated[v] = struct{}{}
+			}
 		}
 
 		opr.Duplicated[duplicationTypeContractID] = struct{}{}
@@ -393,7 +711,12 @@ func GetNewProcessor(opr *OperationProcessor, op base.Operation) (base.Operation
 		currency.Mint,
 		extension.CreateContractAccount,
 		extension.UpdateHandler,
-		extension.Withdraw:
+		extension.Withdraw,
+		did_registry.RegisterModel,
+		did_registry.CreateDID,
+		did_registry.DeactivateDID,
+		did_registry.UpdateDIDDocument,
+		did_registry.ReactivateDID:
 		return nil, false, errors.Errorf("%T needs SetProcessor", t)
 	default:
 		return nil, false, nil

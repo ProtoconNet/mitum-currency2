@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"context"
+	"github.com/ProtoconNet/mitum-currency/v3/common"
 
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
@@ -12,12 +13,19 @@ import (
 type CreateContractAccountCommand struct {
 	BaseCommand
 	OperationFlags
-	Sender    AddressFlag        `arg:"" name:"sender" help:"sender address" required:"true"`
-	Threshold uint               `help:"threshold for keys (default: ${create_contract_account_threshold})" default:"${create_contract_account_threshold}"` // nolint
-	Key       KeyFlag            `name:"key" help:"key for new account (ex: \"<public key>,<weight>\") separator @"`
-	Amount    CurrencyAmountFlag `arg:"" name:"currency-amount" help:"amount (ex: \"<currency>,<amount>\")"`
-	sender    base.Address
-	keys      types.AccountKeys
+	Sender           AddressFlag        `arg:"" name:"sender" help:"sender address" required:"true"`
+	Threshold        uint               `help:"threshold for keys (default: ${create_contract_account_threshold})" default:"${create_contract_account_threshold}"` // nolint
+	Key              KeyFlag            `name:"key" help:"key for new account (ex: \"<public key>,<weight>\") separator @"`
+	Amount           CurrencyAmountFlag `arg:"" name:"currency-amount" help:"amount (ex: \"<currency>,<amount>\")"`
+	DIDContract      AddressFlag        `name:"authentication-contract" help:"contract account for authentication"`
+	AuthenticationID string             `name:"authentication-id" help:"auth id for authentication"`
+	ProofData        string             `name:"authentication-proof-data" help:"proof data for authentication"`
+	IsPrivateKey     bool               `name:"is-privatekey" help:"proor-data is private key, not signature"`
+	ProxyPayer       AddressFlag        `name:"settlement-proxy-payer" help:"proxy payer account for settlement"`
+	sender           base.Address
+	didContract      base.Address
+	proxyPayer       base.Address
+	keys             types.AccountKeys
 }
 
 func (cmd *CreateContractAccountCommand) Run(pctx context.Context) error { // nolint:dupl
@@ -71,6 +79,22 @@ func (cmd *CreateContractAccountCommand) parseFlags() error {
 		}
 	}
 
+	if len(cmd.DIDContract.String()) > 0 {
+		a, err := cmd.DIDContract.Encode(cmd.Encoders.JSON())
+		if err != nil {
+			return errors.Wrapf(err, "invalid contract format, %v", cmd.DIDContract.String())
+		}
+		cmd.didContract = a
+	}
+
+	if len(cmd.ProxyPayer.String()) > 0 {
+		a, err := cmd.ProxyPayer.Encode(cmd.Encoders.JSON())
+		if err != nil {
+			return errors.Wrapf(err, "invalid proxy payer format, %v", cmd.ProxyPayer.String())
+		}
+		cmd.proxyPayer = a
+	}
+
 	return nil
 }
 
@@ -97,6 +121,31 @@ func (cmd *CreateContractAccountCommand) createOperation() (base.Operation, erro
 	if err != nil {
 		return nil, errors.Wrap(err, "create create-contract-account operation")
 	}
+	var baseAuthentication common.Authentication
+	var baseSettlement common.Settlement
+	var proofData = cmd.ProofData
+	if cmd.IsPrivateKey {
+		prk, err := base.DecodePrivatekeyFromString(cmd.ProofData, enc)
+		if err != nil {
+			return nil, err
+		}
+
+		sig, err := prk.Sign(fact.Hash().Bytes())
+		if err != nil {
+			return nil, err
+		}
+		proofData = sig.String()
+	}
+
+	if cmd.didContract != nil && cmd.AuthenticationID != "" && cmd.ProofData != "" {
+		baseAuthentication = common.NewBaseAuthentication(cmd.didContract, cmd.AuthenticationID, proofData)
+		op.SetAuthentication(baseAuthentication)
+	}
+	if cmd.proxyPayer != nil {
+		baseSettlement = common.NewBaseSettlement(cmd.proxyPayer)
+		op.SetSettlement(baseSettlement)
+	}
+
 	err = op.HashSign(cmd.Privatekey, cmd.NetworkID.NetworkID())
 	if err != nil {
 		return nil, errors.Wrap(err, "create create-contract-account operation")

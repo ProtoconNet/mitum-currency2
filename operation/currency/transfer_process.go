@@ -198,8 +198,13 @@ func (opp *TransferProcessor) PreProcess(
 			common.ErrMPreProcess.Wrap(common.ErrMTypeMismatch).Errorf("expected %T, not %T", TransferFact{}, op.Fact()),
 		), nil
 	}
+	user := fact.Sender()
+	exFact, ok := op.Fact().(common.ExtendedFact)
+	if ok {
+		user = exFact.User()
+	}
 
-	if _, _, aErr, cErr := state.ExistsCAccount(fact.Sender(), "sender", true, false, getStateFunc); aErr != nil {
+	if _, _, aErr, cErr := state.ExistsCAccount(user, "sender", true, false, getStateFunc); aErr != nil {
 		return ctx, base.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.Errorf("%v", aErr)), nil
 	} else if cErr != nil {
@@ -207,7 +212,7 @@ func (opp *TransferProcessor) PreProcess(
 			common.ErrMPreProcess.Wrap(common.ErrMCAccountNA).Errorf("%v", cErr)), nil
 	}
 
-	if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
+	if err := state.CheckFactSignsByState(user, op.Signs(), getStateFunc); err != nil {
 		return ctx, base.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.Wrap(common.ErrMSignInvalid).Errorf("%v", err)), nil
 	}
@@ -262,22 +267,22 @@ func (opp *TransferProcessor) Process( // nolint:dupl
 		return nil, base.NewBaseOperationProcessReasonError("expected %T, not %T", TransferFact{}, op.Fact()), nil
 	}
 
-	var (
-		senderBalSts, feeReceiverBalSts map[types.CurrencyID]base.State
-		required                        map[types.CurrencyID][2]common.Big
-		err                             error
-	)
+	//var (
+	//	senderBalSts, feeReceiverBalSts map[types.CurrencyID]base.State
+	//	required                        map[types.CurrencyID][2]common.Big
+	//	err                             error
+	//)
 
-	if feeReceiverBalSts, required, err = opp.calculateItemsFee(op, getStateFunc); err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("calculate fee: %w", err), nil
-	} else if senderBalSts, err = CheckEnoughBalance(fact.Sender(), required, getStateFunc); err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("check enough balance: %w", err), nil
-	} else {
-		opp.required = required
-	}
+	//if feeReceiverBalSts, required, err = opp.calculateItemsFee(op, getStateFunc); err != nil {
+	//	return nil, base.NewBaseOperationProcessReasonError("calculate fee: %w", err), nil
+	//} else if senderBalSts, err = CheckEnoughBalance(fact.Sender(), required, getStateFunc); err != nil {
+	//	return nil, base.NewBaseOperationProcessReasonError("check enough balance: %w", err), nil
+	//} else {
+	//	opp.required = required
+	//}
 
 	//ns := make([]*TransferItemProcessor, len(fact.items))
-	var stmvs []base.StateMergeValue // nolint:prealloc
+	var stateMergeValues []base.StateMergeValue // nolint:prealloc
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	errChan := make(chan *base.BaseOperationProcessReasonError, len(fact.items))
@@ -309,7 +314,7 @@ func (opp *TransferProcessor) Process( // nolint:dupl
 				return
 			}
 			mu.Lock()
-			stmvs = append(stmvs, s...)
+			stateMergeValues = append(stateMergeValues, s...)
 			mu.Unlock()
 			c.Close()
 		}(fact.items[i])
@@ -324,53 +329,89 @@ func (opp *TransferProcessor) Process( // nolint:dupl
 		}
 	}
 
+	var required map[types.CurrencyID][]common.Big
+	switch i := op.Fact().(type) {
+	case FeeBaser:
+		required, _ = i.FeeBase()
+	default:
+	}
+
+	senderBalSts, totals, err := PrepareSenderState(fact.Sender(), required, getStateFunc)
+	if err != nil {
+		return nil, base.NewBaseOperationProcessReasonError("process CreateAccount; %w", err), nil
+	}
+
 	for cid := range senderBalSts {
 		v, ok := senderBalSts[cid].Value().(currency.BalanceStateValue)
 		if !ok {
 			return nil, base.NewBaseOperationProcessReasonError(
-				"expected %T, not %T", currency.BalanceStateValue{}, senderBalSts[cid].Value()), nil
+				"expected %T, not %T",
+				currency.BalanceStateValue{},
+				senderBalSts[cid].Value(),
+			), nil
 		}
 
-		_, feeReceiverFound := feeReceiverBalSts[cid]
-
-		var stmv base.StateMergeValue
-		if feeReceiverFound && (senderBalSts[cid].Key() == feeReceiverBalSts[cid].Key()) {
-			stmv = common.NewBaseStateMergeValue(
-				senderBalSts[cid].Key(),
-				currency.NewDeductBalanceStateValue(v.Amount.WithBig(opp.required[cid][0].Sub(opp.required[cid][1]))),
-				func(height base.Height, st base.State) base.StateValueMerger {
-					return currency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
-				},
+		total, found := totals[cid]
+		if found {
+			stateMergeValues = append(
+				stateMergeValues,
+				common.NewBaseStateMergeValue(
+					senderBalSts[cid].Key(),
+					currency.NewDeductBalanceStateValue(v.Amount.WithBig(total)),
+					func(height base.Height, st base.State) base.StateValueMerger {
+						return currency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
+					}),
 			)
-		} else {
-			stmv = common.NewBaseStateMergeValue(
-				senderBalSts[cid].Key(),
-				currency.NewDeductBalanceStateValue(v.Amount.WithBig(opp.required[cid][0])),
-				func(height base.Height, st base.State) base.StateValueMerger {
-					return currency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
-				},
-			)
-			if feeReceiverFound {
-				r, ok := feeReceiverBalSts[cid].Value().(currency.BalanceStateValue)
-				if !ok {
-					return nil, base.NewBaseOperationProcessReasonError("expected %T, not %T", currency.BalanceStateValue{}, feeReceiverBalSts[cid].Value()), nil
-				}
-				stmvs = append(
-					stmvs,
-					common.NewBaseStateMergeValue(
-						feeReceiverBalSts[cid].Key(),
-						currency.NewAddBalanceStateValue(r.Amount.WithBig(opp.required[cid][1])),
-						func(height base.Height, st base.State) base.StateValueMerger {
-							return currency.NewBalanceStateValueMerger(height, feeReceiverBalSts[cid].Key(), cid, st)
-						},
-					),
-				)
-			}
 		}
-		stmvs = append(stmvs, stmv)
 	}
 
-	return stmvs, nil, nil
+	//for cid := range senderBalSts {
+	//	v, ok := senderBalSts[cid].Value().(currency.BalanceStateValue)
+	//	if !ok {
+	//		return nil, base.NewBaseOperationProcessReasonError(
+	//			"expected %T, not %T", currency.BalanceStateValue{}, senderBalSts[cid].Value()), nil
+	//	}
+	//
+	//	_, feeReceiverFound := feeReceiverBalSts[cid]
+	//
+	//	var stmv base.StateMergeValue
+	//	if feeReceiverFound && (senderBalSts[cid].Key() == feeReceiverBalSts[cid].Key()) {
+	//		stmv = common.NewBaseStateMergeValue(
+	//			senderBalSts[cid].Key(),
+	//			currency.NewDeductBalanceStateValue(v.Amount.WithBig(opp.required[cid][0].Sub(opp.required[cid][1]))),
+	//			func(height base.Height, st base.State) base.StateValueMerger {
+	//				return currency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
+	//			},
+	//		)
+	//	} else {
+	//		stmv = common.NewBaseStateMergeValue(
+	//			senderBalSts[cid].Key(),
+	//			currency.NewDeductBalanceStateValue(v.Amount.WithBig(opp.required[cid][0])),
+	//			func(height base.Height, st base.State) base.StateValueMerger {
+	//				return currency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
+	//			},
+	//		)
+	//		if feeReceiverFound {
+	//			r, ok := feeReceiverBalSts[cid].Value().(currency.BalanceStateValue)
+	//			if !ok {
+	//				return nil, base.NewBaseOperationProcessReasonError("expected %T, not %T", currency.BalanceStateValue{}, feeReceiverBalSts[cid].Value()), nil
+	//			}
+	//			stmvs = append(
+	//				stmvs,
+	//				common.NewBaseStateMergeValue(
+	//					feeReceiverBalSts[cid].Key(),
+	//					currency.NewAddBalanceStateValue(r.Amount.WithBig(opp.required[cid][1])),
+	//					func(height base.Height, st base.State) base.StateValueMerger {
+	//						return currency.NewBalanceStateValueMerger(height, feeReceiverBalSts[cid].Key(), cid, st)
+	//					},
+	//				),
+	//			)
+	//		}
+	//	}
+	//	stmvs = append(stmvs, stmv)
+	//}
+
+	return stateMergeValues, nil, nil
 }
 
 func (opp *TransferProcessor) Close() error {
