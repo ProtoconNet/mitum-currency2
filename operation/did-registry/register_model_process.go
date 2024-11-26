@@ -119,13 +119,13 @@ func (opp *RegisterModelProcessor) PreProcess(
 			)), nil
 	}
 
-	if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
-		return ctx, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMSignInvalid).
-				Errorf("%v", err),
-		), nil
-	}
+	//if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
+	//	return ctx, mitumbase.NewBaseOperationProcessReasonError(
+	//		common.ErrMPreProcess.
+	//			Wrap(common.ErrMSignInvalid).
+	//			Errorf("%v", err),
+	//	), nil
+	//}
 
 	return ctx, nil, nil
 }

@@ -51,19 +51,30 @@ func (op *BaseAuthentication) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 }
 
 type BaseSettlementBSONUnmarshaler struct {
+	OpSender   string `bson:"op_sender"`
 	ProxyPayer string `bson:"proxy_payer"`
 }
 
 func (op BaseSettlement) MarshalBSON() ([]byte, error) {
+	if _, ok := op.ProxyPayer(); ok {
+		return bsonenc.Marshal(
+			bson.M{
+				"op_sender":   op.opSender.String(),
+				"proxy_payer": op.proxyPayer.String(),
+			},
+		)
+	}
 	return bsonenc.Marshal(
 		bson.M{
-			"proxy_payer": op.proxyPayer.String(),
+			"op_sender":   op.opSender.String(),
+			"proxy_payer": "",
 		},
 	)
 }
 
 func (op *BaseSettlement) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 	if len(b) < 1 {
+		op.opSender = nil
 		op.proxyPayer = nil
 
 		return nil
@@ -74,13 +85,23 @@ func (op *BaseSettlement) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 		return DecorateError(err, ErrDecodeBson, *op)
 	}
 
-	a, err := base.DecodeAddress(u.ProxyPayer, enc)
+	a, err := base.DecodeAddress(u.OpSender, enc)
 	if err != nil {
 		if err != nil {
 			return DecorateError(err, ErrDecodeBson, *op)
 		}
 	}
-	op.proxyPayer = a
+	op.opSender = a
+
+	if len(u.ProxyPayer) > 0 {
+		a, err = base.DecodeAddress(u.ProxyPayer, enc)
+		if err != nil {
+			if err != nil {
+				return DecorateError(err, ErrDecodeBson, *op)
+			}
+		}
+		op.proxyPayer = a
+	}
 
 	return nil
 }

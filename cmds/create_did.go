@@ -12,23 +12,20 @@ import (
 type CreateDIDCommand struct {
 	BaseCommand
 	OperationFlags
-	Sender           AddressFlag    `arg:"" name:"sender" help:"sender address" required:"true"`
-	Contract         AddressFlag    `arg:"" name:"contract" help:"contract address" required:"true"`
-	AuthType         string         `arg:"" name:"auth-type" help:"authentication type" required:"true"`
-	PubKey           string         `arg:"" name:"pubKey" help:"public key" required:"true"`
-	ServiceType      string         `arg:"" name:"service-type" help:"service type" required:"true"`
-	ServiceEndpoint  string         `arg:"" name:"service-endpoint" help:"service endpoint" required:"true"`
-	Currency         CurrencyIDFlag `arg:"" name:"currency" help:"currency id" required:"true"`
-	DIDContract      AddressFlag    `name:"authentication-contract" help:"contract account for authentication"`
-	AuthenticationID string         `name:"authentication-id" help:"auth id for authentication"`
-	ProofData        string         `name:"authentication-proof-data" help:"proof data for authentication"`
-	IsPrivateKey     bool           `name:"is-privatekey" help:"proor-data is private key, not signature"`
-	ProxyPayer       AddressFlag    `name:"settlement-proxy-payer" help:"proxy payer account for settlement"`
-	sender           base.Address
-	contract         base.Address
-	didContract      base.Address
-	proxyPayer       base.Address
-	pubKey           base.Publickey
+	Sender          AddressFlag    `arg:"" name:"sender" help:"sender address" required:"true"`
+	Contract        AddressFlag    `arg:"" name:"contract" help:"contract address" required:"true"`
+	AuthType        string         `arg:"" name:"auth-type" help:"authentication type" required:"true"`
+	PubKey          string         `arg:"" name:"pubKey" help:"public key" required:"true"`
+	ServiceType     string         `arg:"" name:"service-type" help:"service type" required:"true"`
+	ServiceEndpoint string         `arg:"" name:"service-endpoint" help:"service endpoint" required:"true"`
+	Currency        CurrencyIDFlag `arg:"" name:"currency" help:"currency id" required:"true"`
+	OperationExtensionFlags
+	sender      base.Address
+	contract    base.Address
+	didContract base.Address
+	proxyPayer  base.Address
+	opSender    base.Address
+	pubKey      base.Publickey
 }
 
 func (cmd *CreateDIDCommand) Run(pctx context.Context) error { // nolint:dupl
@@ -88,6 +85,14 @@ func (cmd *CreateDIDCommand) parseFlags() error {
 		cmd.didContract = a
 	}
 
+	if len(cmd.OpSender.String()) > 0 {
+		a, err := cmd.OpSender.Encode(cmd.Encoders.JSON())
+		if err != nil {
+			return errors.Wrapf(err, "invalid proxy payer format, %v", cmd.ProxyPayer.String())
+		}
+		cmd.opSender = a
+	}
+
 	if len(cmd.ProxyPayer.String()) > 0 {
 		a, err := cmd.ProxyPayer.Encode(cmd.Encoders.JSON())
 		if err != nil {
@@ -103,7 +108,7 @@ func (cmd *CreateDIDCommand) createOperation() (base.Operation, error) { // noli
 	e := util.StringError("failed to create CreateDID operation")
 
 	fact := did.NewCreateDIDFact(
-		[]byte(cmd.Token), cmd.sender, cmd.contract, cmd.sender,
+		[]byte(cmd.Token), cmd.sender, cmd.contract,
 		cmd.AuthType, cmd.pubKey, cmd.ServiceType, cmd.ServiceEndpoint, cmd.Currency.CID,
 	)
 
@@ -132,14 +137,20 @@ func (cmd *CreateDIDCommand) createOperation() (base.Operation, error) { // noli
 		baseAuthentication = common.NewBaseAuthentication(cmd.didContract, cmd.AuthenticationID, proofData)
 		op.SetAuthentication(baseAuthentication)
 	}
-	if cmd.proxyPayer != nil {
-		baseSettlement = common.NewBaseSettlement(cmd.proxyPayer)
-		op.SetSettlement(baseSettlement)
-	}
 
-	err = op.Sign(cmd.Privatekey, cmd.NetworkID.NetworkID())
-	if err != nil {
-		return nil, e.Wrap(err)
+	if cmd.opSender != nil {
+		baseSettlement = common.NewBaseSettlement(cmd.opSender, cmd.proxyPayer)
+		op.SetSettlement(baseSettlement)
+
+		err = op.Sign(cmd.OpSenderPrivatekey, cmd.NetworkID.NetworkID())
+		if err != nil {
+			return nil, errors.Wrap(err, "create create-account operation")
+		}
+	} else {
+		err = op.Sign(cmd.Privatekey, cmd.NetworkID.NetworkID())
+		if err != nil {
+			return nil, errors.Wrap(err, "create create-account operation")
+		}
 	}
 
 	return op, nil

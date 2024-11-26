@@ -91,6 +91,10 @@ func (fact UpdateDIDDocumentFact) Sender() mitumbase.Address {
 	return fact.sender
 }
 
+func (fact UpdateDIDDocumentFact) Signer() mitumbase.Address {
+	return fact.sender
+}
+
 func (fact UpdateDIDDocumentFact) Contract() mitumbase.Address {
 	return fact.contract
 }

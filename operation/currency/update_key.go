@@ -80,6 +80,10 @@ func (fact UpdateKeyFact) Sender() base.Address {
 	return fact.sender
 }
 
+func (fact UpdateKeyFact) Signer() base.Address {
+	return fact.sender
+}
+
 func (fact UpdateKeyFact) Addresses() ([]base.Address, error) {
 	as := make([]base.Address, 1)
 	as[0] = fact.Sender()

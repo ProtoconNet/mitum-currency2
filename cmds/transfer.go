@@ -14,16 +14,13 @@ import (
 type TransferCommand struct {
 	BaseCommand
 	OperationFlags
-	Sender           AddressFlag               `arg:"" name:"sender" help:"sender address" required:"true"`
-	ReceiverAmount   AddressCurrencyAmountFlag `arg:"" name:"receiver-currency-amount" help:"receiver amount (ex: \"<address>,<currency>,<amount>\") separator @" required:"true"`
-	DIDContract      AddressFlag               `name:"authentication-contract" help:"contract account for authentication"`
-	AuthenticationID string                    `name:"authentication-id" help:"auth id for authentication"`
-	ProofData        string                    `name:"authentication-proof-data" help:"proof data for authentication"`
-	IsPrivateKey     bool                      `name:"is-privatekey" help:"proor-data is private key, not signature"`
-	ProxyPayer       AddressFlag               `name:"settlement-proxy-payer" help:"proxy payer account for settlement"`
-	sender           base.Address
-	didContract      base.Address
-	proxyPayer       base.Address
+	Sender         AddressFlag               `arg:"" name:"sender" help:"sender address" required:"true"`
+	ReceiverAmount AddressCurrencyAmountFlag `arg:"" name:"receiver-currency-amount" help:"receiver amount (ex: \"<address>,<currency>,<amount>\") separator @" required:"true"`
+	OperationExtensionFlags
+	sender      base.Address
+	didContract base.Address
+	proxyPayer  base.Address
+	opSender    base.Address
 }
 
 func (cmd *TransferCommand) Run(pctx context.Context) error {
@@ -65,6 +62,14 @@ func (cmd *TransferCommand) parseFlags() error {
 			return errors.Wrapf(err, "invalid contract format, %v", cmd.DIDContract.String())
 		}
 		cmd.didContract = a
+	}
+
+	if len(cmd.OpSender.String()) > 0 {
+		a, err := cmd.OpSender.Encode(cmd.Encoders.JSON())
+		if err != nil {
+			return errors.Wrapf(err, "invalid proxy payer format, %v", cmd.ProxyPayer.String())
+		}
+		cmd.opSender = a
 	}
 
 	if len(cmd.ProxyPayer.String()) > 0 {
@@ -115,14 +120,20 @@ func (cmd *TransferCommand) createOperation() (base.Operation, error) { // nolin
 		baseAuthentication = common.NewBaseAuthentication(cmd.didContract, cmd.AuthenticationID, proofData)
 		op.SetAuthentication(baseAuthentication)
 	}
-	if cmd.proxyPayer != nil {
-		baseSettlement = common.NewBaseSettlement(cmd.proxyPayer)
-		op.SetSettlement(baseSettlement)
-	}
 
-	err = op.HashSign(cmd.Privatekey, cmd.NetworkID.NetworkID())
-	if err != nil {
-		return nil, errors.Wrap(err, "create transfer operation")
+	if cmd.opSender != nil {
+		baseSettlement = common.NewBaseSettlement(cmd.opSender, cmd.proxyPayer)
+		op.SetSettlement(baseSettlement)
+
+		err = op.HashSign(cmd.OpSenderPrivatekey, cmd.NetworkID.NetworkID())
+		if err != nil {
+			return nil, errors.Wrap(err, "create create-account operation")
+		}
+	} else {
+		err = op.HashSign(cmd.Privatekey, cmd.NetworkID.NetworkID())
+		if err != nil {
+			return nil, errors.Wrap(err, "create create-account operation")
+		}
 	}
 
 	if err := op.IsValid(cmd.OperationFlags.NetworkID); err != nil {

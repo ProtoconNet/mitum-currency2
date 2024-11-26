@@ -87,6 +87,10 @@ func (fact DeactivateDIDFact) Sender() mitumbase.Address {
 	return fact.sender
 }
 
+func (fact DeactivateDIDFact) Signer() mitumbase.Address {
+	return fact.sender
+}
+
 func (fact DeactivateDIDFact) Contract() mitumbase.Address {
 	return fact.contract
 }

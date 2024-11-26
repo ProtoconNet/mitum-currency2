@@ -117,6 +117,10 @@ func (fact TransferFact) Sender() base.Address {
 	return fact.sender
 }
 
+func (fact TransferFact) Signer() base.Address {
+	return fact.sender
+}
+
 func (fact TransferFact) Items() []TransferItem {
 	return fact.items
 }

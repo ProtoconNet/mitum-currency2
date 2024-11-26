@@ -21,6 +21,10 @@ type FeeBaser interface {
 	FeeBase() (map[types.CurrencyID][]common.Big, base.Address)
 }
 
+type Signer interface {
+	Signer() base.Address
+}
+
 type AmountsItem interface {
 	Amounts() []types.Amount
 }
@@ -128,6 +132,10 @@ func (fact CreateAccountFact) Token() base.Token {
 }
 
 func (fact CreateAccountFact) Sender() base.Address {
+	return fact.sender
+}
+
+func (fact CreateAccountFact) Signer() base.Address {
 	return fact.sender
 }
 

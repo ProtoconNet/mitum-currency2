@@ -196,12 +196,12 @@ func (opp *WithdrawProcessor) PreProcess(
 				Errorf("sender %v is contract account", fact.Sender())), nil
 	}
 
-	if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMSignInvalid).
-				Errorf("%v", err)), nil
-	}
+	//if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
+	//	return ctx, base.NewBaseOperationProcessReasonError(
+	//		common.ErrMPreProcess.
+	//			Wrap(common.ErrMSignInvalid).
+	//			Errorf("%v", err)), nil
+	//}
 
 	for i := range fact.items {
 		cip := withdrawItemProcessorPool.Get()

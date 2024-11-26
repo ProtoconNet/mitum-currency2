@@ -90,6 +90,10 @@ func (fact RegisterModelFact) Sender() mitumbase.Address {
 	return fact.sender
 }
 
+func (fact RegisterModelFact) Signer() mitumbase.Address {
+	return fact.sender
+}
+
 func (fact RegisterModelFact) Contract() mitumbase.Address {
 	return fact.contract
 }

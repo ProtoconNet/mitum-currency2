@@ -14,29 +14,30 @@ import (
 )
 
 type IExtendedOperation interface {
-	Contract() base.Address
+	Contract() (base.Address, bool)
 	AuthenticationID() string
 	ProofData() string
 	VerifyAuth(base.GetStateFunc) error
-	ProxyPayer() base.Address
+	OpSender() (base.Address, bool)
+	ProxyPayer() (base.Address, bool)
 	VerifyPayment(base.GetStateFunc) error
 	GetAuthentication() Authentication
 	GetSettlement() Settlement
 }
 
-type IAuthentication interface {
-	Contract() base.Address
-	AuthenticationID() string
-	ProofData() string
-	VerifyAuth(base.GetStateFunc) error
-	Bytes() []byte
-}
+//type IAuthentication interface {
+//	Contract() base.Address
+//	AuthenticationID() string
+//	ProofData() string
+//	VerifyAuth(base.GetStateFunc) error
+//	Bytes() []byte
+//}
 
-type ISettlement interface {
-	ProxyPayer() base.Address
-	VerifyPayment(base.GetStateFunc) error
-	Bytes() []byte
-}
+//type ISettlement interface {
+//	ProxyPayer() base.Address
+//	VerifyPayment(base.GetStateFunc) error
+//	Bytes() []byte
+//}
 
 type ExtendedOperation struct {
 	Authentication

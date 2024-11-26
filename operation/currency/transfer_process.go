@@ -212,10 +212,10 @@ func (opp *TransferProcessor) PreProcess(
 			common.ErrMPreProcess.Wrap(common.ErrMCAccountNA).Errorf("%v", cErr)), nil
 	}
 
-	if err := state.CheckFactSignsByState(user, op.Signs(), getStateFunc); err != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.Wrap(common.ErrMSignInvalid).Errorf("%v", err)), nil
-	}
+	//if err := state.CheckFactSignsByState(user, op.Signs(), getStateFunc); err != nil {
+	//	return ctx, base.NewBaseOperationProcessReasonError(
+	//		common.ErrMPreProcess.Wrap(common.ErrMSignInvalid).Errorf("%v", err)), nil
+	//}
 
 	var wg sync.WaitGroup
 	errChan := make(chan *base.BaseOperationProcessReasonError, len(fact.items))
