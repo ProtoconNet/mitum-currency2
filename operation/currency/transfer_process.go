@@ -198,13 +198,8 @@ func (opp *TransferProcessor) PreProcess(
 			common.ErrMPreProcess.Wrap(common.ErrMTypeMismatch).Errorf("expected %T, not %T", TransferFact{}, op.Fact()),
 		), nil
 	}
-	user := fact.Sender()
-	exFact, ok := op.Fact().(common.ExtendedFact)
-	if ok {
-		user = exFact.User()
-	}
 
-	if _, _, aErr, cErr := state.ExistsCAccount(user, "sender", true, false, getStateFunc); aErr != nil {
+	if _, _, aErr, cErr := state.ExistsCAccount(fact.Sender(), "sender", true, false, getStateFunc); aErr != nil {
 		return ctx, base.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.Errorf("%v", aErr)), nil
 	} else if cErr != nil {

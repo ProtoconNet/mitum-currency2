@@ -182,44 +182,44 @@ func (ba BaseAuthentication) VerifyAuth(getStateFunc base.GetStateFunc) error {
 	return nil
 }
 
-type OperationExtension interface {
-	ExtType() string
-	RunExtension(base.GetStateFunc) error
-	Bytes() []byte
-}
-
-type UserAuthentication struct {
-	authentication Authentication
-	extType        string
-}
-
-func NewUserAuthentication(
-	authentication Authentication,
-) UserAuthentication {
-	return UserAuthentication{
-		authentication: authentication,
-		extType:        "UserAuthentication",
-	}
-}
-
-func (ba UserAuthentication) ExtType() string {
-	return ba.extType
-}
-
-func (ba UserAuthentication) RunExtension(getStateFunc base.GetStateFunc) error {
-	err := ba.authentication.VerifyAuth(getStateFunc)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (ba UserAuthentication) Bytes() []byte {
-	var bs [][]byte
-	bs = append(bs, ba.authentication.Bytes())
-	bs = append(bs, []byte(ba.extType))
-	return util.ConcatBytesSlice(bs...)
-}
+//type OperationExtension interface {
+//	ExtType() string
+//	RunExtension(base.GetStateFunc) error
+//	Bytes() []byte
+//}
+//
+//type UserAuthentication struct {
+//	authentication Authentication
+//	extType        string
+//}
+//
+//func NewUserAuthentication(
+//	authentication Authentication,
+//) UserAuthentication {
+//	return UserAuthentication{
+//		authentication: authentication,
+//		extType:        "UserAuthentication",
+//	}
+//}
+//
+//func (ba UserAuthentication) ExtType() string {
+//	return ba.extType
+//}
+//
+//func (ba UserAuthentication) RunExtension(getStateFunc base.GetStateFunc) error {
+//	err := ba.authentication.VerifyAuth(getStateFunc)
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}
+//
+//func (ba UserAuthentication) Bytes() []byte {
+//	var bs [][]byte
+//	bs = append(bs, ba.authentication.Bytes())
+//	bs = append(bs, []byte(ba.extType))
+//	return util.ConcatBytesSlice(bs...)
+//}
 
 //type ExtendedOperation interface {
 //	Extension() OperationExtension
