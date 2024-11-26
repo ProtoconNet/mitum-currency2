@@ -114,6 +114,10 @@ func (fact WithdrawFact) Sender() base.Address {
 	return fact.sender
 }
 
+func (fact WithdrawFact) Signer() base.Address {
+	return fact.sender
+}
+
 func (fact WithdrawFact) Items() []WithdrawItem {
 	return fact.items
 }

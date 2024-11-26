@@ -113,6 +113,10 @@ func (fact UpdateHandlerFact) Sender() base.Address {
 	return fact.sender
 }
 
+func (fact UpdateHandlerFact) Signer() base.Address {
+	return fact.sender
+}
+
 func (fact UpdateHandlerFact) Contract() base.Address {
 	return fact.contract
 }

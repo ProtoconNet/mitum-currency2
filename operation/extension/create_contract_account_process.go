@@ -235,12 +235,12 @@ func (opp *CreateContractAccountProcessor) PreProcess(
 				Errorf("%v: sender account, %v", err, fact.Sender())), nil
 	}
 
-	if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMSignInvalid).
-				Errorf("%v", err)), nil
-	}
+	//if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
+	//	return ctx, base.NewBaseOperationProcessReasonError(
+	//		common.ErrMPreProcess.
+	//			Wrap(common.ErrMSignInvalid).
+	//			Errorf("%v", err)), nil
+	//}
 
 	items := fact.Items()
 	var wg sync.WaitGroup

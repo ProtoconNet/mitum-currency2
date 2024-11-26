@@ -52,11 +52,13 @@ func (op *BaseAuthentication) DecodeJSON(b []byte, enc encoder.Encoder) error {
 }
 
 type BaseSettlementJSONMarshaler struct {
+	OpSender   base.Address `json:"op_sender"`
 	ProxyPayer base.Address `json:"proxy_payer"`
 }
 
 func (op BaseSettlement) JSONMarshaler() BaseSettlementJSONMarshaler {
 	return BaseSettlementJSONMarshaler{
+		OpSender:   op.opSender,
 		ProxyPayer: op.proxyPayer,
 	}
 }
@@ -66,6 +68,7 @@ func (op BaseSettlement) MarshalJSON() ([]byte, error) {
 }
 
 type BaseSettlementJSONUnmarshaler struct {
+	OpSender   string `json:"op_sender"`
 	ProxyPayer string `json:"proxy_payer"`
 }
 
@@ -76,7 +79,15 @@ func (op *BaseSettlement) DecodeJSON(b []byte, enc encoder.Encoder) error {
 		return DecorateError(err, ErrDecodeJson, *op)
 	}
 
-	a, err := base.DecodeAddress(u.ProxyPayer, enc)
+	a, err := base.DecodeAddress(u.OpSender, enc)
+	if err != nil {
+		if err != nil {
+			return DecorateError(err, ErrDecodeJson, *op)
+		}
+	}
+	op.opSender = a
+
+	a, err = base.DecodeAddress(u.ProxyPayer, enc)
 	if err != nil {
 		if err != nil {
 			return DecorateError(err, ErrDecodeJson, *op)

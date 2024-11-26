@@ -121,12 +121,12 @@ func (opp *UpdateHandlerProcessor) PreProcess(
 		}
 	}
 
-	if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMSignInvalid).
-				Errorf("%v", err)), nil
-	}
+	//if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
+	//	return ctx, base.NewBaseOperationProcessReasonError(
+	//		common.ErrMPreProcess.
+	//			Wrap(common.ErrMSignInvalid).
+	//			Errorf("%v", err)), nil
+	//}
 
 	return ctx, nil, nil
 }

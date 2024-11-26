@@ -221,6 +221,27 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 	switch k := op.(type) {
 	case common.IExtendedOperation:
 		if k.GetAuthentication() != nil && k.GetSettlement() != nil {
+			err := k.GetAuthentication().IsValid(nil)
+			if err != nil {
+				return ctx, base.NewBaseOperationProcessReasonError(
+					common.ErrMPreProcess.Errorf("%v", err)), nil
+			}
+			err = k.GetSettlement().IsValid(nil)
+			if err != nil {
+				return ctx, base.NewBaseOperationProcessReasonError(
+					common.ErrMPreProcess.Errorf("%v", err)), nil
+			}
+
+			opSender, _ := k.GetSettlement().OpSender()
+			if err := state.CheckFactSignsByState(opSender, op.Signs(), getStateFunc); err != nil {
+				return ctx,
+					base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.
+							Wrap(common.ErrMSignInvalid).
+							Errorf("%v", err),
+					), nil
+			}
+
 			var authentication types.IAuthentication
 			var doc types.DIDDocument
 			dr, err := types.NewDIDResourceFromString(k.AuthenticationID())
@@ -228,7 +249,8 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 				return ctx, nil, err
 			}
 
-			if st, err := state.ExistsState(didstate.DocumentStateKey(k.Contract(), dr.DID()), "did document", getStateFunc); err != nil {
+			contract, _ := k.Contract()
+			if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
 				return ctx, nil, err
 			} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
 				return ctx, nil, err
@@ -263,13 +285,29 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 						common.ErrMPreProcess.Errorf("%v", err)), nil
 				}
 
-				payer := k.ProxyPayer()
-				if _, _, aErr, cErr := state.ExistsCAccount(payer, "proxy payer", true, true, getStateFunc); aErr != nil {
+				opSender, ok := k.OpSender()
+				if !ok {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", errors.Errorf("empty op sender"))), nil
+				}
+
+				if _, _, aErr, cErr := state.ExistsCAccount(opSender, "op sender", true, false, getStateFunc); aErr != nil {
 					return ctx, base.NewBaseOperationProcessReasonError(
 						common.ErrMPreProcess.Errorf("%v", aErr)), nil
 				} else if cErr != nil {
 					return ctx, base.NewBaseOperationProcessReasonError(
 						common.ErrMPreProcess.Errorf("%v", cErr)), nil
+				}
+
+				proxyPayer, ok := k.ProxyPayer()
+				if ok {
+					if _, _, aErr, cErr := state.ExistsCAccount(proxyPayer, "proxy payer", true, true, getStateFunc); aErr != nil {
+						return ctx, base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.Errorf("%v", aErr)), nil
+					} else if cErr != nil {
+						return ctx, base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.Errorf("%v", cErr)), nil
+					}
 				}
 			case types.AuthTypeVC:
 				details := authentication.Details()
@@ -291,7 +329,8 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 				}
 
 				var doc types.DIDDocument
-				if st, err := state.ExistsState(didstate.DocumentStateKey(k.Contract(), dr.DID()), "did document", getStateFunc); err != nil {
+				contract, _ := k.Contract()
+				if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
 					return ctx, nil, err
 				} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
 					return ctx, nil, err
@@ -330,15 +369,44 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 						common.ErrMPreProcess.Errorf("signature verification failed, %v", err)), nil
 				}
 
-				payer := k.ProxyPayer()
-				if _, _, aErr, cErr := state.ExistsCAccount(payer, "proxy payer", true, true, getStateFunc); aErr != nil {
+				opSender, ok := k.OpSender()
+				if !ok {
+					return ctx, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Errorf("%v", errors.Errorf("empty op sender"))), nil
+				}
+
+				if _, _, aErr, cErr := state.ExistsCAccount(opSender, "op sender", true, false, getStateFunc); aErr != nil {
 					return ctx, base.NewBaseOperationProcessReasonError(
 						common.ErrMPreProcess.Errorf("%v", aErr)), nil
 				} else if cErr != nil {
 					return ctx, base.NewBaseOperationProcessReasonError(
 						common.ErrMPreProcess.Errorf("%v", cErr)), nil
 				}
+
+				proxyPayer, ok := k.ProxyPayer()
+				if ok {
+					if _, _, aErr, cErr := state.ExistsCAccount(proxyPayer, "proxy payer", true, true, getStateFunc); aErr != nil {
+						return ctx, base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.Errorf("%v", aErr)), nil
+					} else if cErr != nil {
+						return ctx, base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.Errorf("%v", cErr)), nil
+					}
+				}
 			default:
+			}
+		} else {
+			fact := op.Fact()
+			signerFact, ok := fact.(currency.Signer)
+			if ok {
+				if err := state.CheckFactSignsByState(signerFact.Signer(), op.Signs(), getStateFunc); err != nil {
+					return ctx,
+						base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.
+								Wrap(common.ErrMSignInvalid).
+								Errorf("%v", err),
+						), nil
+				}
 			}
 		}
 	default:
@@ -366,22 +434,28 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 
 	stateMergeValues, reasonErr, err := sp.Process(ctx, op, getStateFunc)
 
-	var isProxyPayer bool
+	var isUserOperation bool
 	switch i := op.Fact().(type) {
 	case currency.FeeBaser:
 		m, payer := i.FeeBase()
 		switch k := op.(type) {
 		case common.IExtendedOperation:
 			if k.GetAuthentication() != nil && k.GetSettlement() != nil {
-				isProxyPayer = true
-				payer = k.ProxyPayer()
-				if _, _, aErr, cErr := state.ExistsCAccount(payer, "proxy payer", true, true, getStateFunc); aErr != nil {
-					return nil, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", aErr)), nil
-				} else if cErr != nil {
-					return nil, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", cErr)), nil
+				isUserOperation = true
+				opSender, _ := k.OpSender()
+				payer = opSender
+				if proxyPayer, ok := k.ProxyPayer(); ok {
+					payer = proxyPayer
 				}
+				//
+				//
+				//if _, _, aErr, cErr := state.ExistsCAccount(payer, "payer", true, true, getStateFunc); aErr != nil {
+				//	return nil, base.NewBaseOperationProcessReasonError(
+				//		common.ErrMPreProcess.Errorf("%v", aErr)), nil
+				//} else if cErr != nil {
+				//	return nil, base.NewBaseOperationProcessReasonError(
+				//		common.ErrMPreProcess.Errorf("%v", cErr)), nil
+				//}
 			}
 		default:
 		}
@@ -448,7 +522,7 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 				return nil, nil, e.Wrap(err)
 			}
 
-			if !isProxyPayer {
+			if !isUserOperation {
 				reg := sendAmount[cid].Add(rq)
 				if am.Big().Compare(reg) < 0 {
 					return nil, base.NewBaseOperationProcessReasonError(
@@ -581,7 +655,7 @@ func CheckDuplication(opr *OperationProcessor, op base.Operation) error {
 			return errors.Errorf("expected %T, not %T", did_registry.CreateDIDFact{}, t.Fact())
 		}
 		duplicationTypeDIDPubKey = []string{DuplicationKey(
-			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.Address()), DuplicationTypeDIDPubKey)}
+			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.Sender()), DuplicationTypeDIDPubKey)}
 		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
 	case did_registry.DeactivateDID:
 		fact, ok := t.Fact().(did_registry.DeactivateDIDFact)

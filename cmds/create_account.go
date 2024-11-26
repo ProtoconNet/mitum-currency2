@@ -13,19 +13,16 @@ import (
 type CreateAccountCommand struct {
 	BaseCommand
 	OperationFlags
-	Sender           AddressFlag        `arg:"" name:"sender" help:"sender address" required:"true"`
-	Threshold        uint               `help:"threshold for keys (default: ${create_account_threshold})" default:"${create_account_threshold}"` // nolint
-	Key              KeyFlag            `name:"key" help:"key for new account (ex: \"<public key>,<weight>\") separator @"`
-	Amount           CurrencyAmountFlag `arg:"" name:"currency-amount" help:"amount (ex: \"<currency>,<amount>\")"`
-	DIDContract      AddressFlag        `name:"authentication-contract" help:"contract account for authentication"`
-	AuthenticationID string             `name:"authentication-id" help:"auth id for authentication"`
-	ProofData        string             `name:"authentication-proof-data" help:"proof data for authentication"`
-	IsPrivateKey     bool               `name:"is-privatekey" help:"proor-data is private key, not signature"`
-	ProxyPayer       AddressFlag        `name:"settlement-proxy-payer" help:"proxy payer account for settlement"`
-	sender           base.Address
-	didContract      base.Address
-	proxyPayer       base.Address
-	keys             types.AccountKeys
+	Sender    AddressFlag        `arg:"" name:"sender" help:"sender address" required:"true"`
+	Threshold uint               `help:"threshold for keys (default: ${create_account_threshold})" default:"${create_account_threshold}"` // nolint
+	Key       KeyFlag            `name:"key" help:"key for new account (ex: \"<public key>,<weight>\") separator @"`
+	Amount    CurrencyAmountFlag `arg:"" name:"currency-amount" help:"amount (ex: \"<currency>,<amount>\")"`
+	OperationExtensionFlags
+	sender      base.Address
+	didContract base.Address
+	proxyPayer  base.Address
+	opSender    base.Address
+	keys        types.AccountKeys
 }
 
 func (cmd *CreateAccountCommand) Run(pctx context.Context) error { // nolint:dupl
@@ -95,6 +92,14 @@ func (cmd *CreateAccountCommand) parseFlags() error {
 		cmd.didContract = a
 	}
 
+	if len(cmd.OpSender.String()) > 0 {
+		a, err := cmd.OpSender.Encode(cmd.Encoders.JSON())
+		if err != nil {
+			return errors.Wrapf(err, "invalid proxy payer format, %v", cmd.ProxyPayer.String())
+		}
+		cmd.opSender = a
+	}
+
 	if len(cmd.ProxyPayer.String()) > 0 {
 		a, err := cmd.ProxyPayer.Encode(cmd.Encoders.JSON())
 		if err != nil {
@@ -156,14 +161,20 @@ func (cmd *CreateAccountCommand) createOperation() (base.Operation, error) { // 
 		baseAuthentication = common.NewBaseAuthentication(cmd.didContract, cmd.AuthenticationID, proofData)
 		op.SetAuthentication(baseAuthentication)
 	}
-	if cmd.proxyPayer != nil {
-		baseSettlement = common.NewBaseSettlement(cmd.proxyPayer)
-		op.SetSettlement(baseSettlement)
-	}
 
-	err = op.HashSign(cmd.Privatekey, cmd.NetworkID.NetworkID())
-	if err != nil {
-		return nil, errors.Wrap(err, "create create-account operation")
+	if cmd.opSender != nil {
+		baseSettlement = common.NewBaseSettlement(cmd.opSender, cmd.proxyPayer)
+		op.SetSettlement(baseSettlement)
+
+		err = op.HashSign(cmd.OpSenderPrivatekey, cmd.NetworkID.NetworkID())
+		if err != nil {
+			return nil, errors.Wrap(err, "create create-account operation")
+		}
+	} else {
+		err = op.HashSign(cmd.Privatekey, cmd.NetworkID.NetworkID())
+		if err != nil {
+			return nil, errors.Wrap(err, "create create-account operation")
+		}
 	}
 
 	return op, nil

@@ -3,26 +3,41 @@ package common
 import (
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
+	"github.com/pkg/errors"
 )
 
 type Settlement interface {
-	ProxyPayer() base.Address
+	util.IsValider
+	OpSender() (base.Address, bool)
+	ProxyPayer() (base.Address, bool)
 	VerifyPayment(base.GetStateFunc) error
 	Bytes() []byte
 }
 
 type BaseSettlement struct {
+	opSender   base.Address
 	proxyPayer base.Address
 }
 
-func NewBaseSettlement(proxyPayer base.Address) BaseSettlement {
+func NewBaseSettlement(opSender, proxyPayer base.Address) BaseSettlement {
 	return BaseSettlement{
+		opSender:   opSender,
 		proxyPayer: proxyPayer,
 	}
 }
 
-func (ba BaseSettlement) ProxyPayer() base.Address {
-	return ba.proxyPayer
+func (ba BaseSettlement) OpSender() (base.Address, bool) {
+	if ba.opSender == nil {
+		return nil, false
+	}
+	return ba.opSender, true
+}
+
+func (ba BaseSettlement) ProxyPayer() (base.Address, bool) {
+	if ba.proxyPayer == nil {
+		return nil, false
+	}
+	return ba.proxyPayer, true
 }
 
 func (ba BaseSettlement) VerifyPayment(getStateFunc base.GetStateFunc) error {
@@ -31,11 +46,28 @@ func (ba BaseSettlement) VerifyPayment(getStateFunc base.GetStateFunc) error {
 
 func (ba BaseSettlement) Bytes() []byte {
 	var bs [][]byte
+	bs = append(bs, ba.opSender.Bytes())
 	bs = append(bs, ba.proxyPayer.Bytes())
 	return util.ConcatBytesSlice(bs...)
 }
 
+func (ba BaseSettlement) IsValid([]byte) error {
+	if err := util.CheckIsValiders(nil, false, ba.opSender); err != nil {
+		return ErrValueInvalid.Wrap(err)
+	}
+
+	if err := util.CheckIsValiders(nil, true, ba.proxyPayer); err != nil {
+		return ErrValueInvalid.Wrap(err)
+	}
+
+	return nil
+}
+
 func (ba BaseSettlement) Equal(b BaseSettlement) bool {
+	if !ba.opSender.Equal(b.opSender) {
+		return false
+	}
+
 	if !ba.proxyPayer.Equal(b.proxyPayer) {
 		return false
 	}
@@ -44,7 +76,8 @@ func (ba BaseSettlement) Equal(b BaseSettlement) bool {
 }
 
 type Authentication interface {
-	Contract() base.Address
+	util.IsValider
+	Contract() (base.Address, bool)
 	AuthenticationID() string
 	ProofData() string
 	VerifyAuth(base.GetStateFunc) error
@@ -65,8 +98,11 @@ func NewBaseAuthentication(contract base.Address, authenticationID, proofData st
 	}
 }
 
-func (ba BaseAuthentication) Contract() base.Address {
-	return ba.contract
+func (ba BaseAuthentication) Contract() (base.Address, bool) {
+	if ba.contract == nil {
+		return nil, false
+	}
+	return ba.contract, true
 }
 
 func (ba BaseAuthentication) AuthenticationID() string {
@@ -83,6 +119,22 @@ func (ba BaseAuthentication) Bytes() []byte {
 	bs = append(bs, []byte(ba.authenticationID))
 	bs = append(bs, []byte(ba.proofData))
 	return util.ConcatBytesSlice(bs...)
+}
+
+func (ba BaseAuthentication) IsValid([]byte) error {
+	if err := util.CheckIsValiders(nil, false, ba.contract); err != nil {
+		return ErrValueInvalid.Wrap(err)
+	}
+
+	if len(ba.authenticationID) < 1 {
+		return ErrValueInvalid.Wrap(errors.Errorf("empty authentication id"))
+	}
+
+	if len(ba.proofData) < 1 {
+		return ErrValueInvalid.Wrap(errors.Errorf("empty proof data"))
+	}
+
+	return nil
 }
 
 func (ba BaseAuthentication) Equal(b BaseAuthentication) bool {

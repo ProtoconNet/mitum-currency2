@@ -91,10 +91,10 @@ func (opp *UpdateKeyProcessor) PreProcess(
 			common.ErrMPreProcess.Wrap(common.ErrMValueInvalid).Errorf("sender keys is same with keys to update, keys hash %v", fact.keys.Hash())), nil
 	}
 
-	if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.Wrap(common.ErrMSignInvalid).Errorf("%v", err)), nil
-	}
+	//if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
+	//	return ctx, base.NewBaseOperationProcessReasonError(
+	//		common.ErrMPreProcess.Wrap(common.ErrMSignInvalid).Errorf("%v", err)), nil
+	//}
 
 	return ctx, nil, nil
 }

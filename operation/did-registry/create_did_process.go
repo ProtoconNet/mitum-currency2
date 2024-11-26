@@ -90,12 +90,12 @@ func (opp *CreateDIDProcessor) PreProcess(
 				Errorf("%v", cErr)), nil
 	}
 
-	if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
-		return ctx, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMSignInvalid).
-				Errorf("%v", err)), nil
-	}
+	//if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
+	//	return ctx, mitumbase.NewBaseOperationProcessReasonError(
+	//		common.ErrMPreProcess.
+	//			Wrap(common.ErrMSignInvalid).
+	//			Errorf("%v", err)), nil
+	//}
 
 	_, _, aErr, cErr := state.ExistsCAccount(fact.Contract(), "contract", true, true, getStateFunc)
 	if aErr != nil {
@@ -123,11 +123,11 @@ func (opp *CreateDIDProcessor) PreProcess(
 			)), nil
 	}
 
-	if found, _ := state.CheckNotExistsState(didstate.DataStateKey(fact.Contract(), fact.Address().String()), getStateFunc); found {
+	if found, _ := state.CheckNotExistsState(didstate.DataStateKey(fact.Contract(), fact.Sender().String()), getStateFunc); found {
 		return nil, mitumbase.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.
 				Wrap(common.ErrMStateE).Errorf("did data for address %v in contract account %v",
-				fact.Address(), fact.Contract(),
+				fact.Sender(), fact.Contract(),
 			)), nil
 	}
 
@@ -148,7 +148,7 @@ func (opp *CreateDIDProcessor) Process( // nolint:dupl
 	}
 
 	didData := types.NewData(
-		fact.Address(), design.DIDMethod(),
+		fact.Sender(), design.DIDMethod(),
 	)
 	if err := didData.IsValid(nil); err != nil {
 		return nil, mitumbase.NewBaseOperationProcessReasonError("invalid did data; %w", err), nil
@@ -156,7 +156,7 @@ func (opp *CreateDIDProcessor) Process( // nolint:dupl
 
 	var sts []mitumbase.StateMergeValue // nolint:prealloc
 	sts = append(sts, state.NewStateMergeValue(
-		didstate.DataStateKey(fact.Contract(), fact.Address().String()),
+		didstate.DataStateKey(fact.Contract(), fact.Sender().String()),
 		didstate.NewDataStateValue(didData),
 	))
 

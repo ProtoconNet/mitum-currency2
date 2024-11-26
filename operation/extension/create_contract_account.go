@@ -119,6 +119,10 @@ func (fact CreateContractAccountFact) Sender() base.Address {
 	return fact.sender
 }
 
+func (fact CreateContractAccountFact) Signer() base.Address {
+	return fact.sender
+}
+
 func (fact CreateContractAccountFact) Items() []CreateContractAccountItem {
 	return fact.items
 }
