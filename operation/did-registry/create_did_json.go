@@ -12,7 +12,6 @@ type CreateDIDFactJSONMarshaler struct {
 	mitumbase.BaseFactJSONMarshaler
 	Sender          mitumbase.Address `json:"sender"`
 	Contract        mitumbase.Address `json:"contract"`
-	Address         mitumbase.Address `json:"address"`
 	AuthType        string            `json:"authType"`
 	PublicKey       string            `json:"publicKey"`
 	ServiceType     string            `json:"serviceType"`
@@ -25,7 +24,6 @@ func (fact CreateDIDFact) MarshalJSON() ([]byte, error) {
 		BaseFactJSONMarshaler: fact.BaseFact.JSONMarshaler(),
 		Sender:                fact.sender,
 		Contract:              fact.contract,
-		Address:               fact.address,
 		AuthType:              fact.authType,
 		PublicKey:             fact.publicKey.String(),
 		ServiceType:           fact.serviceType,
@@ -38,7 +36,6 @@ type CreateDIDFactJSONUnmarshaler struct {
 	mitumbase.BaseFactJSONUnmarshaler
 	Sender          string `json:"sender"`
 	Contract        string `json:"contract"`
-	Address         string `json:"address"`
 	AuthType        string `json:"authType"`
 	PublicKey       string `json:"publicKey"`
 	ServiceType     string `json:"serviceType"`
@@ -59,7 +56,7 @@ func (fact *CreateDIDFact) DecodeJSON(b []byte, enc encoder.Encoder) error {
 		return common.DecorateError(err, common.ErrDecodeJson, *fact)
 	}
 
-	if err := fact.unpack(enc, u.Sender, u.Contract, u.Address, u.AuthType, pubKey, u.ServiceType, u.ServiceEndpoint, u.Currency); err != nil {
+	if err := fact.unpack(enc, u.Sender, u.Contract, u.AuthType, pubKey, u.ServiceType, u.ServiceEndpoint, u.Currency); err != nil {
 		return common.DecorateError(err, common.ErrDecodeJson, *fact)
 	}
 
