@@ -19,7 +19,6 @@ type CreateDIDFact struct {
 	mitumbase.BaseFact
 	sender          mitumbase.Address
 	contract        mitumbase.Address
-	address         mitumbase.Address
 	authType        string
 	publicKey       mitumbase.Publickey
 	serviceType     string
@@ -28,14 +27,13 @@ type CreateDIDFact struct {
 }
 
 func NewCreateDIDFact(
-	token []byte, sender, contract, address mitumbase.Address,
+	token []byte, sender, contract mitumbase.Address,
 	authType string, publicKey mitumbase.Publickey, serviceType, serviceEndpoint string, currency currencytypes.CurrencyID) CreateDIDFact {
 	bf := mitumbase.NewBaseFact(CreateDIDFactHint, token)
 	fact := CreateDIDFact{
 		BaseFact:        bf,
 		sender:          sender,
 		contract:        contract,
-		address:         address,
 		authType:        authType,
 		publicKey:       publicKey,
 		serviceType:     serviceType,
@@ -57,7 +55,6 @@ func (fact CreateDIDFact) IsValid(b []byte) error {
 		fact.BaseHinter,
 		fact.sender,
 		fact.contract,
-		fact.address,
 		fact.currency,
 	); err != nil {
 		return common.ErrFactInvalid.Wrap(err)
@@ -83,7 +80,6 @@ func (fact CreateDIDFact) Bytes() []byte {
 		fact.Token(),
 		fact.sender.Bytes(),
 		fact.contract.Bytes(),
-		fact.address.Bytes(),
 		[]byte(fact.authType),
 		fact.publicKey.Bytes(),
 		[]byte(fact.serviceType),
@@ -100,12 +96,12 @@ func (fact CreateDIDFact) Sender() mitumbase.Address {
 	return fact.sender
 }
 
-func (fact CreateDIDFact) Contract() mitumbase.Address {
-	return fact.contract
+func (fact CreateDIDFact) Signer() mitumbase.Address {
+	return fact.sender
 }
 
-func (fact CreateDIDFact) Address() mitumbase.Address {
-	return fact.address
+func (fact CreateDIDFact) Contract() mitumbase.Address {
+	return fact.contract
 }
 
 func (fact CreateDIDFact) AuthType() string {

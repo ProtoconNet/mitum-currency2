@@ -18,7 +18,6 @@ func (fact CreateDIDFact) MarshalBSON() ([]byte, error) {
 			"token":           fact.BaseFact.Token(),
 			"sender":          fact.sender,
 			"contract":        fact.contract,
-			"address":         fact.address,
 			"authType":        fact.authType,
 			"publicKey":       fact.publicKey.String(),
 			"serviceType":     fact.serviceType,
@@ -32,7 +31,6 @@ type CreateDIDFactBSONUnmarshaler struct {
 	Hint            string `bson:"_hint"`
 	Sender          string `bson:"sender"`
 	Contract        string `bson:"contract"`
-	Address         string `bson:"address"`
 	AuthType        string `bson:"authType"`
 	PublicKey       string `bson:"publicKey"`
 	ServiceType     string `bson:"serviceType"`
@@ -67,7 +65,7 @@ func (fact *CreateDIDFact) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 		return common.DecorateError(err, common.ErrDecodeJson, *fact)
 	}
 
-	if err := fact.unpack(enc, uf.Sender, uf.Contract, uf.Address, uf.AuthType, pubKey, uf.ServiceType, uf.ServiceEndpoint, uf.Currency); err != nil {
+	if err := fact.unpack(enc, uf.Sender, uf.Contract, uf.AuthType, pubKey, uf.ServiceType, uf.ServiceEndpoint, uf.Currency); err != nil {
 		return common.DecorateError(err, common.ErrDecodeBson, *fact)
 	}
 
