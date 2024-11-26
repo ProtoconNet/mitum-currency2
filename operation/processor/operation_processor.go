@@ -3,19 +3,20 @@ package processor
 import (
 	"context"
 	"fmt"
-	"github.com/ProtoconNet/mitum-currency/v3/common"
-	"github.com/ProtoconNet/mitum-currency/v3/state"
-	didstate "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
-	"github.com/btcsuite/btcutil/base58"
 	"io"
 	"sync"
 
+	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/did-registry"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
+	"github.com/ProtoconNet/mitum-currency/v3/state"
 	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
+	didstate "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
+	stateextention "github.com/ProtoconNet/mitum-currency/v3/state/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
+	"github.com/btcsuite/btcutil/base58"
 
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/ProtoconNet/mitum2/util/hint"
@@ -435,9 +436,11 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 	stateMergeValues, reasonErr, err := sp.Process(ctx, op, getStateFunc)
 
 	var isUserOperation bool
+	var payer base.Address
 	switch i := op.Fact().(type) {
 	case currency.FeeBaser:
-		m, payer := i.FeeBase()
+		m, sender := i.FeeBase()
+		payer = sender
 		switch k := op.(type) {
 		case common.IExtendedOperation:
 			if k.GetAuthentication() != nil && k.GetSettlement() != nil {
@@ -445,17 +448,22 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 				opSender, _ := k.OpSender()
 				payer = opSender
 				if proxyPayer, ok := k.ProxyPayer(); ok {
-					payer = proxyPayer
+					if _, cSt, aErr, cErr := state.ExistsCAccount(proxyPayer, "payer", true, true, getStateFunc); aErr != nil {
+						return nil, base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.Errorf("%v", aErr)), nil
+					} else if cErr != nil {
+						return nil, base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.Errorf("%v", cErr)), nil
+					} else if ca, err := stateextention.LoadCAStateValue(cSt); err != nil {
+						return nil, base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.Errorf("%v", err)), nil
+					} else if ca.IsRecipients(sender) {
+						payer = proxyPayer
+					} else {
+						return nil, base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.Errorf("user is not recipient of proxy payer")), nil
+					}
 				}
-				//
-				//
-				//if _, _, aErr, cErr := state.ExistsCAccount(payer, "payer", true, true, getStateFunc); aErr != nil {
-				//	return nil, base.NewBaseOperationProcessReasonError(
-				//		common.ErrMPreProcess.Errorf("%v", aErr)), nil
-				//} else if cErr != nil {
-				//	return nil, base.NewBaseOperationProcessReasonError(
-				//		common.ErrMPreProcess.Errorf("%v", cErr)), nil
-				//}
 			}
 		default:
 		}
