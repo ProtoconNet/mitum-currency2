@@ -42,7 +42,6 @@ type CreateAccountItem interface {
 type CreateAccountFact struct {
 	base.BaseFact
 	sender base.Address
-	user   base.Address
 	items  []CreateAccountItem
 }
 
@@ -137,10 +136,6 @@ func (fact CreateAccountFact) Sender() base.Address {
 
 func (fact CreateAccountFact) Signer() base.Address {
 	return fact.sender
-}
-
-func (fact CreateAccountFact) User() base.Address {
-	return fact.user
 }
 
 func (fact CreateAccountFact) Items() []CreateAccountItem {
