@@ -45,9 +45,14 @@ func (ba BaseSettlement) VerifyPayment(getStateFunc base.GetStateFunc) error {
 }
 
 func (ba BaseSettlement) Bytes() []byte {
+	if ba.Equal(BaseSettlement{}) {
+		return []byte{}
+	}
 	var bs [][]byte
 	bs = append(bs, ba.opSender.Bytes())
-	bs = append(bs, ba.proxyPayer.Bytes())
+	if ba.proxyPayer != nil {
+		bs = append(bs, ba.proxyPayer.Bytes())
+	}
 	return util.ConcatBytesSlice(bs...)
 }
 
@@ -114,6 +119,9 @@ func (ba BaseAuthentication) ProofData() string {
 }
 
 func (ba BaseAuthentication) Bytes() []byte {
+	if ba.Equal(BaseAuthentication{}) {
+		return []byte{}
+	}
 	var bs [][]byte
 	bs = append(bs, ba.contract.Bytes())
 	bs = append(bs, []byte(ba.authenticationID))

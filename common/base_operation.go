@@ -94,12 +94,32 @@ func (op *BaseOperation) SetSettlement(settlement Settlement) {
 	op.Settlement = settlement
 }
 
+func (op *BaseOperation) Sign(priv base.Privatekey, networkID base.NetworkID) error {
+	err := op.MBaseOperation.Sign(priv, networkID)
+	if err != nil {
+		return err
+	}
+
+	op.h = op.hash()
+
+	return nil
+}
+
+func (op BaseOperation) hash() util.Hash {
+	return valuehash.NewSHA256(op.HashBytes())
+}
+
 func (op BaseOperation) HashBytes() []byte {
-	var bs []util.Byter
-	bs = append(bs, op.MBaseOperation)
-	bs = append(bs, op.Authentication)
-	bs = append(bs, op.Settlement)
-	return util.ConcatByters(bs...)
+	var bs [][]byte
+	bs = append(bs, op.MBaseOperation.HashBytes())
+	if op.Authentication != nil {
+		bs = append(bs, op.Authentication.Bytes())
+	}
+	if op.Settlement != nil {
+		bs = append(bs, op.Settlement.Bytes())
+	}
+
+	return util.ConcatBytesSlice(bs...)
 }
 
 func (op BaseOperation) String() string {
@@ -112,6 +132,13 @@ func (op BaseOperation) String() string {
 func (op BaseOperation) IsValid(networkID []byte) error {
 	if err := util.CheckIsValiders(networkID, false, op.MBaseOperation); err != nil {
 		return ErrOperationInvalid.Wrap(err)
+	}
+	if err := util.CheckIsValiders(networkID, true, op.Authentication, op.Settlement); err != nil {
+		return ErrOperationInvalid.Wrap(err)
+	}
+
+	if !op.h.Equal(op.hash()) {
+		return ErrOperationInvalid.Wrap(ErrValueInvalid.Wrap(errors.Errorf("hash does not match")))
 	}
 	return nil
 }
@@ -193,10 +220,6 @@ func (op MBaseOperation) IsValid(networkID []byte) error {
 
 	if err := IsValidSignFact(op, networkID); err != nil {
 		return ErrOperationInvalid.Wrap(err)
-	}
-
-	if !op.h.Equal(op.hash()) {
-		return ErrOperationInvalid.Wrap(ErrValueInvalid.Wrap(errors.Errorf("hash does not match")))
 	}
 
 	return nil
