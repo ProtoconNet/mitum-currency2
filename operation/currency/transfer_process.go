@@ -107,24 +107,6 @@ func (opp *TransferItemProcessor) Process(
 		sts = append(sts, smv)
 	}
 
-	//k := currency.AccountStateKey(receiver)
-	//switch _, found, err := getStateFunc(k); {
-	//case err != nil:
-	//	return nil, e.Wrap(err)
-	//case !found:
-	//	nilKys, err := types.NewNilAccountKeysFromAddress(receiver)
-	//	if err != nil {
-	//		return nil, e.Wrap(err)
-	//	}
-	//	acc, err := types.NewAccount(receiver, nilKys)
-	//	if err != nil {
-	//		return nil, e.Wrap(err)
-	//	}
-	//
-	//	sts = append(sts, state.NewStateMergeValue(k, currency.NewAccountStateValue(acc)))
-	//default:
-	//}
-
 	amounts := opp.item.Amounts()
 	for i := range amounts {
 		am := amounts[i]
@@ -207,11 +189,6 @@ func (opp *TransferProcessor) PreProcess(
 			common.ErrMPreProcess.Wrap(common.ErrMCAccountNA).Errorf("%v", cErr)), nil
 	}
 
-	//if err := state.CheckFactSignsByState(user, op.Signs(), getStateFunc); err != nil {
-	//	return ctx, base.NewBaseOperationProcessReasonError(
-	//		common.ErrMPreProcess.Wrap(common.ErrMSignInvalid).Errorf("%v", err)), nil
-	//}
-
 	var wg sync.WaitGroup
 	errChan := make(chan *base.BaseOperationProcessReasonError, len(fact.items))
 	for i := range fact.items {
@@ -261,20 +238,6 @@ func (opp *TransferProcessor) Process( // nolint:dupl
 	if !ok {
 		return nil, base.NewBaseOperationProcessReasonError("expected %T, not %T", TransferFact{}, op.Fact()), nil
 	}
-
-	//var (
-	//	senderBalSts, feeReceiverBalSts map[types.CurrencyID]base.State
-	//	required                        map[types.CurrencyID][2]common.Big
-	//	err                             error
-	//)
-
-	//if feeReceiverBalSts, required, err = opp.calculateItemsFee(op, getStateFunc); err != nil {
-	//	return nil, base.NewBaseOperationProcessReasonError("calculate fee: %w", err), nil
-	//} else if senderBalSts, err = CheckEnoughBalance(fact.Sender(), required, getStateFunc); err != nil {
-	//	return nil, base.NewBaseOperationProcessReasonError("check enough balance: %w", err), nil
-	//} else {
-	//	opp.required = required
-	//}
 
 	//ns := make([]*TransferItemProcessor, len(fact.items))
 	var stateMergeValues []base.StateMergeValue // nolint:prealloc
@@ -359,52 +322,6 @@ func (opp *TransferProcessor) Process( // nolint:dupl
 			)
 		}
 	}
-
-	//for cid := range senderBalSts {
-	//	v, ok := senderBalSts[cid].Value().(currency.BalanceStateValue)
-	//	if !ok {
-	//		return nil, base.NewBaseOperationProcessReasonError(
-	//			"expected %T, not %T", currency.BalanceStateValue{}, senderBalSts[cid].Value()), nil
-	//	}
-	//
-	//	_, feeReceiverFound := feeReceiverBalSts[cid]
-	//
-	//	var stmv base.StateMergeValue
-	//	if feeReceiverFound && (senderBalSts[cid].Key() == feeReceiverBalSts[cid].Key()) {
-	//		stmv = common.NewBaseStateMergeValue(
-	//			senderBalSts[cid].Key(),
-	//			currency.NewDeductBalanceStateValue(v.Amount.WithBig(opp.required[cid][0].Sub(opp.required[cid][1]))),
-	//			func(height base.Height, st base.State) base.StateValueMerger {
-	//				return currency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
-	//			},
-	//		)
-	//	} else {
-	//		stmv = common.NewBaseStateMergeValue(
-	//			senderBalSts[cid].Key(),
-	//			currency.NewDeductBalanceStateValue(v.Amount.WithBig(opp.required[cid][0])),
-	//			func(height base.Height, st base.State) base.StateValueMerger {
-	//				return currency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
-	//			},
-	//		)
-	//		if feeReceiverFound {
-	//			r, ok := feeReceiverBalSts[cid].Value().(currency.BalanceStateValue)
-	//			if !ok {
-	//				return nil, base.NewBaseOperationProcessReasonError("expected %T, not %T", currency.BalanceStateValue{}, feeReceiverBalSts[cid].Value()), nil
-	//			}
-	//			stmvs = append(
-	//				stmvs,
-	//				common.NewBaseStateMergeValue(
-	//					feeReceiverBalSts[cid].Key(),
-	//					currency.NewAddBalanceStateValue(r.Amount.WithBig(opp.required[cid][1])),
-	//					func(height base.Height, st base.State) base.StateValueMerger {
-	//						return currency.NewBalanceStateValueMerger(height, feeReceiverBalSts[cid].Key(), cid, st)
-	//					},
-	//				),
-	//			)
-	//		}
-	//	}
-	//	stmvs = append(stmvs, stmv)
-	//}
 
 	return stateMergeValues, nil, nil
 }

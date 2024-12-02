@@ -57,6 +57,15 @@ func (fact UpdateDIDDocumentFact) IsValid(b []byte) error {
 		return common.ErrFactInvalid.Wrap(err)
 	}
 
+	if _, adrStr, err := types.ParseDIDScheme(fact.did); err != nil {
+		return common.ErrFactInvalid.Wrap(err)
+	} else if err := common.IsValidOperationFact(fact, b); err != nil {
+		return common.ErrFactInvalid.Wrap(err)
+	} else if fact.Sender().String() != adrStr {
+		return common.ErrFactInvalid.Wrap(
+			errors.Errorf("sender %v is not controller of did %v", fact.sender, fact.did))
+	}
+
 	if err := common.IsValidOperationFact(fact, b); err != nil {
 		return common.ErrFactInvalid.Wrap(err)
 	}
