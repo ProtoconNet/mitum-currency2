@@ -1,4 +1,4 @@
 /*
-Package operation provides the currency operations.
+Package currency provides the currency operations.
 */
 package currency

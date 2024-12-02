@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var maxCurenciesCreateAccountItemMultiAmounts = 10
+var maxCurrenciesCreateAccountItemMultiAmounts = 10
 
 var (
 	CreateAccountItemMultiAmountsHint = hint.MustNewHint("mitum-currency-create-account-multiple-amounts-v0.0.1")
@@ -28,8 +28,8 @@ func (it CreateAccountItemMultiAmounts) IsValid([]byte) error {
 		return err
 	}
 
-	if n := len(it.amounts); n > maxCurenciesCreateAccountItemMultiAmounts {
-		return common.ErrValOOR.Wrap(errors.Errorf("Amounts over allowed, %d > %d", n, maxCurenciesCreateAccountItemMultiAmounts))
+	if n := len(it.amounts); n > maxCurrenciesCreateAccountItemMultiAmounts {
+		return common.ErrValOOR.Wrap(errors.Errorf("Amounts over allowed, %d > %d", n, maxCurrenciesCreateAccountItemMultiAmounts))
 	}
 
 	return nil

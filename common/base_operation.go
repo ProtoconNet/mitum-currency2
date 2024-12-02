@@ -17,53 +17,25 @@ type IExtendedOperation interface {
 	Contract() (base.Address, bool)
 	AuthenticationID() string
 	ProofData() string
-	VerifyAuth(base.GetStateFunc) error
 	OpSender() (base.Address, bool)
 	ProxyPayer() (base.Address, bool)
-	VerifyPayment(base.GetStateFunc) error
 	GetAuthentication() Authentication
 	GetSettlement() Settlement
 }
 
-//type IAuthentication interface {
-//	Contract() base.Address
-//	AuthenticationID() string
-//	ProofData() string
-//	VerifyAuth(base.GetStateFunc) error
-//	Bytes() []byte
-//}
-
-//type ISettlement interface {
-//	ProxyPayer() base.Address
-//	VerifyPayment(base.GetStateFunc) error
-//	Bytes() []byte
-//}
-
-type ExtendedOperation struct {
-	Authentication
-	Settlement
+type Authentication interface {
+	util.IsValider
+	Contract() (base.Address, bool)
+	AuthenticationID() string
+	ProofData() string
+	Bytes() []byte
 }
 
-func NewExtendedOperation(authentication Authentication, settlement Settlement) ExtendedOperation {
-	return ExtendedOperation{
-		Authentication: authentication,
-		Settlement:     settlement,
-	}
-}
-
-func (op *ExtendedOperation) SetAuthentication(authentication Authentication) {
-	op.Authentication = authentication
-}
-
-func (op *ExtendedOperation) SetSettlement(settlement Settlement) {
-	op.Settlement = settlement
-}
-
-func (op ExtendedOperation) HashBytes() []byte {
-	var bs []util.Byter
-	bs = append(bs, op.Authentication)
-	bs = append(bs, op.Settlement)
-	return util.ConcatByters(bs...)
+type Settlement interface {
+	util.IsValider
+	OpSender() (base.Address, bool)
+	ProxyPayer() (base.Address, bool)
+	Bytes() []byte
 }
 
 type BaseOperation struct {

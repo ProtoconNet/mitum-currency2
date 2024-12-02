@@ -6,7 +6,6 @@ import (
 
 	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum-currency/v3/state"
-	"github.com/ProtoconNet/mitum-currency/v3/state/currency"
 	"github.com/ProtoconNet/mitum-currency/v3/state/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
@@ -121,13 +120,6 @@ func (opp *UpdateRecipientProcessor) PreProcess(
 		}
 	}
 
-	//if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
-	//	return ctx, base.NewBaseOperationProcessReasonError(
-	//		common.ErrMPreProcess.
-	//			Wrap(common.ErrMSignInvalid).
-	//			Errorf("%v", err)), nil
-	//}
-
 	return ctx, nil, nil
 }
 
@@ -149,14 +141,6 @@ func (opp *UpdateRecipientProcessor) Process( // nolint:dupl
 		return nil, base.NewBaseOperationProcessReasonError("check existence of contract account status %v ; %w", fact.Contract(), err), nil
 	}
 
-	var fee common.Big
-	policy, err := state.ExistsCurrencyPolicy(fact.Currency(), getStateFunc)
-	if err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("check existence of currency id %q: %w", fact.Currency(), err), nil
-	} else if fee, err = policy.Feeer().Fee(common.ZeroBig); err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("check fee of currency id %q: %w", fact.Currency(), err), nil
-	}
-
 	var stmvs []base.StateMergeValue // nolint:prealloc
 
 	for _, recipient := range fact.Recipients() {
@@ -165,50 +149,6 @@ func (opp *UpdateRecipientProcessor) Process( // nolint:dupl
 			return nil, base.NewBaseOperationProcessReasonError("%w", err), nil
 		} else if smv != nil {
 			stmvs = append(stmvs, smv)
-		}
-	}
-
-	var sdBalSt base.State
-	if sdBalSt, err = state.ExistsState(currency.BalanceStateKey(fact.Sender(), fact.Currency()), "balance of sender", getStateFunc); err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("check existence of sender balance %v ; %w", fact.Sender(), err), nil
-	} else if b, err := currency.StateBalanceValue(sdBalSt); err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("check existence of sender balance %v, %v ; %w", fact.Currency(), fact.Sender(), err), nil
-	} else if b.Big().Compare(fee) < 0 {
-		return nil, base.NewBaseOperationProcessReasonError("insufficient balance with fee %v ,%v", fact.Currency(), fact.Sender()), nil
-	}
-
-	v, ok := sdBalSt.Value().(currency.BalanceStateValue)
-	if !ok {
-		return nil, base.NewBaseOperationProcessReasonError("expected BalanceStateValue, not %T", sdBalSt.Value()), nil
-	}
-
-	if policy.Feeer().Receiver() != nil {
-		if err := state.CheckExistsState(currency.AccountStateKey(policy.Feeer().Receiver()), getStateFunc); err != nil {
-			return nil, nil, errors.Errorf("feeer receiver %s not found", policy.Feeer().Receiver())
-		} else if feeRcvrSt, found, err := getStateFunc(currency.BalanceStateKey(policy.Feeer().Receiver(), fact.Currency())); err != nil {
-			return nil, nil, errors.Errorf("feeer receiver %s balance of %s not found", policy.Feeer().Receiver(), fact.Currency())
-		} else if !found {
-			return nil, nil, errors.Errorf("feeer receiver %s balance of %s not found", policy.Feeer().Receiver(), fact.Currency())
-		} else if feeRcvrSt.Key() != sdBalSt.Key() {
-			r, ok := feeRcvrSt.Value().(currency.BalanceStateValue)
-			if !ok {
-				return nil, nil, errors.Errorf("invalid BalanceState value found, %T", feeRcvrSt.Value())
-			}
-			stmvs = append(stmvs, common.NewBaseStateMergeValue(
-				feeRcvrSt.Key(),
-				currency.NewAddBalanceStateValue(r.Amount.WithBig(fee)),
-				func(height base.Height, st base.State) base.StateValueMerger {
-					return currency.NewBalanceStateValueMerger(height, feeRcvrSt.Key(), fact.Currency(), st)
-				},
-			))
-
-			stmvs = append(stmvs, common.NewBaseStateMergeValue(
-				sdBalSt.Key(),
-				currency.NewDeductBalanceStateValue(v.Amount.WithBig(fee)),
-				func(height base.Height, st base.State) base.StateValueMerger {
-					return currency.NewBalanceStateValueMerger(height, sdBalSt.Key(), fact.Currency(), st)
-				},
-			))
 		}
 	}
 

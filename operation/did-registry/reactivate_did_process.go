@@ -7,7 +7,6 @@ import (
 	didstate "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	crtypes "github.com/ProtoconNet/mitum-currency/v3/types"
-	"github.com/pkg/errors"
 	"sync"
 
 	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
@@ -90,13 +89,6 @@ func (opp *ReactivateDIDProcessor) PreProcess(
 			common.ErrMPreProcess.Wrap(common.ErrMCAccountNA).
 				Errorf("%v", cErr)), nil
 	}
-
-	//if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
-	//	return ctx, mitumbase.NewBaseOperationProcessReasonError(
-	//		common.ErrMPreProcess.
-	//			Wrap(common.ErrMSignInvalid).
-	//			Errorf("%v", err)), nil
-	//}
 
 	_, cSt, aErr, cErr := state.ExistsCAccount(fact.Contract(), "contract", true, true, getStateFunc)
 	if aErr != nil {
@@ -203,84 +195,6 @@ func (opp *ReactivateDIDProcessor) Process( // nolint:dupl
 		didstate.DocumentStateKey(fact.Contract(), fact.DID()),
 		didstate.NewDocumentStateValue(d),
 	))
-
-	currencyPolicy, err := state.ExistsCurrencyPolicy(fact.Currency(), getStateFunc)
-	if err != nil {
-		return nil, mitumbase.NewBaseOperationProcessReasonError("currency not found, %q; %w", fact.Currency(), err), nil
-	}
-
-	if currencyPolicy.Feeer().Receiver() == nil {
-		return sts, nil, nil
-	}
-
-	fee, err := currencyPolicy.Feeer().Fee(common.ZeroBig)
-	if err != nil {
-		return nil, mitumbase.NewBaseOperationProcessReasonError(
-			"failed to check fee of currency, %q; %w",
-			fact.Currency(),
-			err,
-		), nil
-	}
-
-	senderBalSt, err := state.ExistsState(
-		statecurrency.BalanceStateKey(fact.Sender(), fact.Currency()),
-		"sender balance",
-		getStateFunc,
-	)
-	if err != nil {
-		return nil, mitumbase.NewBaseOperationProcessReasonError(
-			"sender %v balance not found; %w",
-			fact.Sender(),
-			err,
-		), nil
-	}
-
-	switch senderBal, err := statecurrency.StateBalanceValue(senderBalSt); {
-	case err != nil:
-		return nil, mitumbase.NewBaseOperationProcessReasonError(
-			"failed to get balance value, %q; %w",
-			statecurrency.BalanceStateKey(fact.Sender(), fact.Currency()),
-			err,
-		), nil
-	case senderBal.Big().Compare(fee) < 0:
-		return nil, mitumbase.NewBaseOperationProcessReasonError(
-			"not enough balance of sender, %q",
-			fact.Sender(),
-		), nil
-	}
-
-	v, ok := senderBalSt.Value().(statecurrency.BalanceStateValue)
-	if !ok {
-		return nil, mitumbase.NewBaseOperationProcessReasonError("expected BalanceStateValue, not %T", senderBalSt.Value()), nil
-	}
-
-	if err := state.CheckExistsState(statecurrency.AccountStateKey(currencyPolicy.Feeer().Receiver()), getStateFunc); err != nil {
-		return nil, nil, err
-	} else if feeRcvrSt, found, err := getStateFunc(statecurrency.BalanceStateKey(currencyPolicy.Feeer().Receiver(), fact.currency)); err != nil {
-		return nil, nil, err
-	} else if !found {
-		return nil, nil, errors.Errorf("feeer receiver %s not found", currencyPolicy.Feeer().Receiver())
-	} else if feeRcvrSt.Key() != senderBalSt.Key() {
-		r, ok := feeRcvrSt.Value().(statecurrency.BalanceStateValue)
-		if !ok {
-			return nil, nil, errors.Errorf("expected %T, not %T", statecurrency.BalanceStateValue{}, feeRcvrSt.Value())
-		}
-		sts = append(sts, common.NewBaseStateMergeValue(
-			feeRcvrSt.Key(),
-			statecurrency.NewAddBalanceStateValue(r.Amount.WithBig(fee)),
-			func(height mitumbase.Height, st mitumbase.State) mitumbase.StateValueMerger {
-				return statecurrency.NewBalanceStateValueMerger(height, feeRcvrSt.Key(), fact.currency, st)
-			},
-		))
-
-		sts = append(sts, common.NewBaseStateMergeValue(
-			senderBalSt.Key(),
-			statecurrency.NewDeductBalanceStateValue(v.Amount.WithBig(fee)),
-			func(height mitumbase.Height, st mitumbase.State) mitumbase.StateValueMerger {
-				return statecurrency.NewBalanceStateValueMerger(height, senderBalSt.Key(), fact.currency, st)
-			},
-		))
-	}
 
 	return sts, nil, nil
 }

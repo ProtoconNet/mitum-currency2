@@ -3,6 +3,8 @@ package processor
 import (
 	"context"
 	"fmt"
+	didstate "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
+	"github.com/btcsuite/btcutil/base58"
 	"io"
 	"sync"
 
@@ -12,12 +14,9 @@ import (
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/state"
 	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
-	didstate "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
 	stateextention "github.com/ProtoconNet/mitum-currency/v3/state/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
-	"github.com/btcsuite/btcutil/base58"
-
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/ProtoconNet/mitum2/util/hint"
 	"github.com/ProtoconNet/mitum2/util/logging"
@@ -198,7 +197,7 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 		opr.processorClosers = &sync.Map{}
 	}
 
-	var sp base.OperationProcessor
+	var opp base.OperationProcessor
 
 	if opr.GetNewProcessorFunc == nil {
 		return ctx, nil, e.Errorf("GetNewProcessorFunc is nil")
@@ -209,31 +208,38 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 	case !known:
 		return ctx, nil, e.Errorf("getNewProcessor, %T", op)
 	default:
-		sp = i
+		opp = i
 	}
 
-	switch _, reasonErr, err := sp.PreProcess(ctx, op, getStateFunc); {
+	switch _, reasonErr, err := opp.PreProcess(ctx, op, getStateFunc); {
 	case err != nil:
 		return ctx, nil, e.Wrap(err)
 	case reasonErr != nil:
 		return ctx, reasonErr, nil
 	}
 
-	switch k := op.(type) {
-	case common.IExtendedOperation:
-		if k.GetAuthentication() != nil && k.GetSettlement() != nil {
-			err := k.GetAuthentication().IsValid(nil)
-			if err != nil {
-				return ctx, base.NewBaseOperationProcessReasonError(
-					common.ErrMPreProcess.Errorf("%v", err)), nil
-			}
-			err = k.GetSettlement().IsValid(nil)
-			if err != nil {
+	if extOp, ok := op.(common.IExtendedOperation); ok {
+		if extOp.GetAuthentication() != nil && extOp.GetSettlement() != nil {
+			auth := extOp.GetAuthentication()
+
+			if err := auth.IsValid(nil); err != nil {
 				return ctx, base.NewBaseOperationProcessReasonError(
 					common.ErrMPreProcess.Errorf("%v", err)), nil
 			}
 
-			opSender, _ := k.GetSettlement().OpSender()
+			if err := VerifyAuth(auth, op, getStateFunc); err != nil {
+				return ctx, base.NewBaseOperationProcessReasonError(
+					common.ErrMPreProcess.Errorf("%v", err)), nil
+			}
+
+			settlement := extOp.GetSettlement()
+
+			if err := settlement.IsValid(nil); err != nil {
+				return ctx, base.NewBaseOperationProcessReasonError(
+					common.ErrMPreProcess.Errorf("%v", err)), nil
+			}
+
+			opSender, _ := extOp.GetSettlement().OpSender()
 			if err := state.CheckFactSignsByState(opSender, op.Signs(), getStateFunc); err != nil {
 				return ctx,
 					base.NewBaseOperationProcessReasonError(
@@ -243,158 +249,9 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 					), nil
 			}
 
-			var authentication types.IAuthentication
-			var doc types.DIDDocument
-			dr, err := types.NewDIDResourceFromString(k.AuthenticationID())
-			if err != nil {
-				return ctx, nil, err
-			}
-
-			contract, _ := k.Contract()
-			if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
-				return ctx, nil, err
-			} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
-				return ctx, nil, err
-			}
-
-			authentication, err = doc.Authentication(k.AuthenticationID())
-			if err != nil {
+			if err := VerifyPayment(settlement, getStateFunc); err != nil {
 				return ctx, base.NewBaseOperationProcessReasonError(
 					common.ErrMPreProcess.Errorf("%v", err)), nil
-			}
-
-			if authentication.Controller() != dr.DID() {
-				return ctx, base.NewBaseOperationProcessReasonError(
-					common.ErrMPreProcess.Errorf(
-						"%v", errors.Errorf(
-							"Controller of authentication id, %v is not matched with DID in document, %v", authentication.Controller(), dr.DID()))), nil
-			}
-
-			switch authentication.AuthType() {
-			case types.AuthTypeECDSASECP:
-				details := authentication.Details()
-				pubKey, ok := details.(base.Publickey)
-				if !ok {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", errors.Errorf("expected PublicKey, but %T", details))), nil
-				}
-
-				signature := base58.Decode(k.ProofData())
-				err := pubKey.Verify(op.Fact().Hash().Bytes(), signature)
-				if err != nil {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", err)), nil
-				}
-
-				opSender, ok := k.OpSender()
-				if !ok {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", errors.Errorf("empty op sender"))), nil
-				}
-
-				if _, _, aErr, cErr := state.ExistsCAccount(opSender, "op sender", true, false, getStateFunc); aErr != nil {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", aErr)), nil
-				} else if cErr != nil {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", cErr)), nil
-				}
-
-				proxyPayer, ok := k.ProxyPayer()
-				if ok {
-					if _, _, aErr, cErr := state.ExistsCAccount(proxyPayer, "proxy payer", true, true, getStateFunc); aErr != nil {
-						return ctx, base.NewBaseOperationProcessReasonError(
-							common.ErrMPreProcess.Errorf("%v", aErr)), nil
-					} else if cErr != nil {
-						return ctx, base.NewBaseOperationProcessReasonError(
-							common.ErrMPreProcess.Errorf("%v", cErr)), nil
-					}
-				}
-			case types.AuthTypeVC:
-				details := authentication.Details()
-				m, ok := details.(map[string]interface{})
-				if !ok {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", errors.Errorf("get authentication details"))), nil
-				}
-				p := m["proof"]
-				proof, ok := p.(types.Proof)
-				if !ok {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", errors.Errorf("get vc proof"))), nil
-				}
-				vm := proof.VerificationMethod()
-				dr, err := types.NewDIDResourceFromString(vm)
-				if err != nil {
-					return ctx, nil, err
-				}
-
-				var doc types.DIDDocument
-				contract, _ := k.Contract()
-				if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
-					return ctx, nil, err
-				} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
-					return ctx, nil, err
-				}
-
-				sAuthentication, err := doc.Authentication(vm)
-				if err != nil {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", err)), nil
-				}
-
-				if sAuthentication.Controller() != dr.DID() {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf(
-							"%v", errors.Errorf(
-								"Controller of authentication id, %v is not matched with DID in document, %v", authentication.Controller(), dr.DID()))), nil
-				}
-
-				if sAuthentication.AuthType() != types.AuthTypeECDSASECP {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", errors.Errorf("auth type must be EcdsaSecp256k1VerificationKey2019"))), nil
-				}
-
-				sDetails := sAuthentication.Details()
-				pubKey, ok := sDetails.(base.Publickey)
-				if !ok {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", errors.Errorf("expected PublicKey, but %T", details))), nil
-				}
-
-				signature := base58.Decode(k.ProofData())
-
-				err = pubKey.Verify(op.Fact().Hash().Bytes(), signature)
-				if err != nil {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("signature verification failed, %v", err)), nil
-				}
-
-				opSender, ok := k.OpSender()
-				if !ok {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", errors.Errorf("empty op sender"))), nil
-				}
-
-				if _, _, aErr, cErr := state.ExistsCAccount(opSender, "op sender", true, false, getStateFunc); aErr != nil {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", aErr)), nil
-				} else if cErr != nil {
-					return ctx, base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.Errorf("%v", cErr)), nil
-				}
-
-				proxyPayer, ok := k.ProxyPayer()
-				if ok {
-					if _, _, aErr, cErr := state.ExistsCAccount(proxyPayer, "proxy payer", true, true, getStateFunc); aErr != nil {
-						return ctx, base.NewBaseOperationProcessReasonError(
-							common.ErrMPreProcess.Errorf("%v", aErr)), nil
-					} else if cErr != nil {
-						return ctx, base.NewBaseOperationProcessReasonError(
-							common.ErrMPreProcess.Errorf("%v", cErr)), nil
-					}
-				}
-			default:
 			}
 		} else {
 			fact := op.Fact()
@@ -410,7 +267,12 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 				}
 			}
 		}
-	default:
+	} else {
+		return ctx,
+			base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("%v", errors.Errorf("expected ExtendedOperation, but %T", op)),
+			), nil
 	}
 
 	return ctx, nil, nil
@@ -871,4 +733,127 @@ func (opr *OperationProcessor) close() {
 	operationProcessorPool.Put(opr)
 
 	opr.Log().Debug().Msg("operation processors closed")
+}
+
+func VerifyAuth(ba common.Authentication, op base.Operation, getStateFunc base.GetStateFunc) error {
+	var authentication types.IAuthentication
+	var doc types.DIDDocument
+	dr, err := types.NewDIDResourceFromString(ba.AuthenticationID())
+	if err != nil {
+		return err
+	}
+
+	contract, ok := ba.Contract()
+	if !ok {
+		return errors.Errorf("empty contract address")
+	}
+	if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
+		return err
+	} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
+		return err
+	}
+
+	authentication, err = doc.Authentication(ba.AuthenticationID())
+	if err != nil {
+		return err
+	}
+
+	if authentication.Controller() != dr.DID() {
+		return errors.Errorf(
+			"Controller of authentication id, %v is not matched with DID in document, %v",
+			authentication.Controller(),
+			dr.DID(),
+		)
+	}
+
+	switch authentication.AuthType() {
+	case types.AuthTypeECDSASECP:
+		details := authentication.Details()
+		pubKey, ok := details.(base.Publickey)
+		if !ok {
+			return errors.Errorf("expected PublicKey, but %T", details)
+		}
+
+		signature := base58.Decode(ba.ProofData())
+		err := pubKey.Verify(op.Fact().Hash().Bytes(), signature)
+		if err != nil {
+			return err
+		}
+	case types.AuthTypeVC:
+		details := authentication.Details()
+		m, ok := details.(map[string]interface{})
+		if !ok {
+			return errors.Errorf("get authentication details")
+		}
+		p := m["proof"]
+		proof, ok := p.(types.Proof)
+		if !ok {
+			return errors.Errorf("get vc proof")
+		}
+		vm := proof.VerificationMethod()
+		dr, err := types.NewDIDResourceFromString(vm)
+		if err != nil {
+			return err
+		}
+
+		var doc types.DIDDocument
+		contract, _ := ba.Contract()
+		if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
+			return err
+		} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
+			return err
+		}
+
+		sAuthentication, err := doc.Authentication(vm)
+		if err != nil {
+			return err
+		}
+
+		if sAuthentication.Controller() != dr.DID() {
+			return errors.Errorf(
+				"Controller of authentication id, %v is not matched with DID in document, %v", authentication.Controller(), dr.DID())
+		}
+
+		if sAuthentication.AuthType() != types.AuthTypeECDSASECP {
+			return errors.Errorf("auth type must be EcdsaSecp256k1VerificationKey2019")
+		}
+
+		sDetails := sAuthentication.Details()
+		pubKey, ok := sDetails.(base.Publickey)
+		if !ok {
+			return errors.Errorf("expected PublicKey, but %T", details)
+		}
+
+		signature := base58.Decode(ba.ProofData())
+
+		err = pubKey.Verify(op.Fact().Hash().Bytes(), signature)
+		if err != nil {
+			return errors.Errorf("signature verification failed, %v", err)
+		}
+	default:
+	}
+
+	return nil
+}
+
+func VerifyPayment(ba common.Settlement, getStateFunc base.GetStateFunc) error {
+	opSender, ok := ba.OpSender()
+	if !ok {
+		return errors.Errorf("empty op sender")
+	}
+	if _, _, aErr, cErr := state.ExistsCAccount(opSender, "op sender", true, false, getStateFunc); aErr != nil {
+		return aErr
+	} else if cErr != nil {
+		return cErr
+	}
+
+	proxyPayer, ok := ba.ProxyPayer()
+	if ok {
+		if _, _, aErr, cErr := state.ExistsCAccount(proxyPayer, "proxy payer", true, true, getStateFunc); aErr != nil {
+			return aErr
+		} else if cErr != nil {
+			return cErr
+		}
+	}
+	return nil
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/ProtoconNet/mitum2/util/encoder"
 )
 
-type DeactivateDIDFactJSONMarshaler struct {
+type DeactivateDIDFactJSONMarshaller struct {
 	mitumbase.BaseFactJSONMarshaler
 	Sender   mitumbase.Address `json:"sender"`
 	Contract mitumbase.Address `json:"contract"`
@@ -17,7 +17,7 @@ type DeactivateDIDFactJSONMarshaler struct {
 }
 
 func (fact DeactivateDIDFact) MarshalJSON() ([]byte, error) {
-	return util.MarshalJSON(DeactivateDIDFactJSONMarshaler{
+	return util.MarshalJSON(DeactivateDIDFactJSONMarshaller{
 		BaseFactJSONMarshaler: fact.BaseFact.JSONMarshaler(),
 		Sender:                fact.sender,
 		Contract:              fact.contract,

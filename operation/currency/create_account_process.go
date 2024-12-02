@@ -179,10 +179,10 @@ func NewCreateAccountProcessor() types.GetNewProcessor {
 	) (base.OperationProcessor, error) {
 		e := util.StringError("create new CreateAccountProcessor")
 
-		nopp := createAccountProcessorPool.Get()
-		opp, ok := nopp.(*CreateAccountProcessor)
+		nOpp := createAccountProcessorPool.Get()
+		opp, ok := nOpp.(*CreateAccountProcessor)
 		if !ok {
-			return nil, errors.Errorf("expected %T, not %T", &CreateAccountProcessor{}, nopp)
+			return nil, errors.Errorf("expected %T, not %T", &CreateAccountProcessor{}, nOpp)
 		}
 
 		b, err := base.NewBaseOperationProcessor(
