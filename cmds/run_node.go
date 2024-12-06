@@ -18,6 +18,7 @@ import (
 	"github.com/rs/zerolog"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -407,6 +408,7 @@ func (cmd *RunCommand) pDigestAPIHandlers(ctx context.Context) (context.Context,
 	}
 
 	router := dnt.Router()
+	router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
 
 	handlers, err := cmd.setDigestDefaultHandlers(ctx, params, cache, router, dnt.Queue())
 	if err != nil {

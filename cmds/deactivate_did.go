@@ -105,9 +105,9 @@ func (cmd *DeactivateDIDCommand) createOperation() (base.Operation, error) { // 
 
 	var baseAuthentication common.Authentication
 	var baseSettlement common.Settlement
-	var proofData = cmd.ProofData
+	var proofData = cmd.Proof
 	if cmd.IsPrivateKey {
-		prk, err := base.DecodePrivatekeyFromString(cmd.ProofData, enc)
+		prk, err := base.DecodePrivatekeyFromString(cmd.Proof, enc)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +119,7 @@ func (cmd *DeactivateDIDCommand) createOperation() (base.Operation, error) { // 
 		proofData = sig.String()
 	}
 
-	if cmd.didContract != nil && cmd.AuthenticationID != "" && cmd.ProofData != "" {
+	if cmd.didContract != nil && cmd.AuthenticationID != "" && cmd.Proof != "" {
 		baseAuthentication = common.NewBaseAuthentication(cmd.didContract, cmd.AuthenticationID, proofData)
 		op.SetAuthentication(baseAuthentication)
 	}
