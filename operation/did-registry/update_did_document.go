@@ -148,24 +148,26 @@ func (fact UpdateDIDDocumentFact) ActiveContract() mitumbase.Address {
 }
 
 type UpdateDIDDocument struct {
-	common.BaseOperation
-	*extras.BaseOperationExtensions
+	extras.ExtendedOperation
+	//common.BaseOperation
+	//*extras.BaseOperationExtensions
 }
 
 func NewUpdateDIDDocument(fact UpdateDIDDocumentFact) (UpdateDIDDocument, error) {
 	return UpdateDIDDocument{
-		BaseOperation:           common.NewBaseOperation(UpdateDIDDocumentHint, fact),
-		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+		ExtendedOperation: extras.NewExtendedOperation(UpdateDIDDocumentHint, fact),
+		//BaseOperation:           common.NewBaseOperation(UpdateDIDDocumentHint, fact),
+		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
 
-func (op UpdateDIDDocument) IsValid(networkID []byte) error {
-	if err := op.BaseOperation.IsValid(networkID); err != nil {
-		return err
-	}
-	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-		return err
-	}
-
-	return nil
-}
+//func (op UpdateDIDDocument) IsValid(networkID []byte) error {
+//	if err := op.BaseOperation.IsValid(networkID); err != nil {
+//		return err
+//	}
+//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}

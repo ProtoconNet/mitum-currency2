@@ -130,24 +130,26 @@ func (fact ReactivateDIDFact) ActiveContract() mitumbase.Address {
 }
 
 type ReactivateDID struct {
-	common.BaseOperation
-	*extras.BaseOperationExtensions
+	extras.ExtendedOperation
+	//common.BaseOperation
+	//*extras.BaseOperationExtensions
 }
 
 func NewReactivateDID(fact ReactivateDIDFact) (ReactivateDID, error) {
 	return ReactivateDID{
-		BaseOperation:           common.NewBaseOperation(ReactivateDIDHint, fact),
-		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+		ExtendedOperation: extras.NewExtendedOperation(ReactivateDIDHint, fact),
+		//BaseOperation:           common.NewBaseOperation(ReactivateDIDHint, fact),
+		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
 
-func (op ReactivateDID) IsValid(networkID []byte) error {
-	if err := op.BaseOperation.IsValid(networkID); err != nil {
-		return err
-	}
-	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-		return err
-	}
-
-	return nil
-}
+//func (op ReactivateDID) IsValid(networkID []byte) error {
+//	if err := op.BaseOperation.IsValid(networkID); err != nil {
+//		return err
+//	}
+//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}

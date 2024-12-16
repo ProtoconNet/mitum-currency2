@@ -158,32 +158,34 @@ func (fact UpdateRecipientFact) ContractOwnerOnly() (base.Address, base.Address)
 }
 
 type UpdateRecipient struct {
-	common.BaseOperation
-	*extras.BaseOperationExtensions
+	extras.ExtendedOperation
+	//common.BaseOperation
+	//*extras.BaseOperationExtensions
 }
 
 func NewUpdateRecipient(fact UpdateRecipientFact) (UpdateRecipient, error) {
 	return UpdateRecipient{
-		BaseOperation:           common.NewBaseOperation(UpdateRecipientHint, fact),
-		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+		ExtendedOperation: extras.NewExtendedOperation(UpdateRecipientHint, fact),
+		//BaseOperation:           common.NewBaseOperation(UpdateRecipientHint, fact),
+		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
 
-func (op *UpdateRecipient) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
-	err := op.Sign(priv, networkID)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (op UpdateRecipient) IsValid(networkID []byte) error {
-	if err := op.BaseOperation.IsValid(networkID); err != nil {
-		return err
-	}
-	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-		return err
-	}
-
-	return nil
-}
+//func (op *UpdateRecipient) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
+//	err := op.Sign(priv, networkID)
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}
+//
+//func (op UpdateRecipient) IsValid(networkID []byte) error {
+//	if err := op.BaseOperation.IsValid(networkID); err != nil {
+//		return err
+//	}
+//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}

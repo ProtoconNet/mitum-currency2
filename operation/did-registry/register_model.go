@@ -131,24 +131,26 @@ func (fact RegisterModelFact) InActiveContractOwnerHandlerOnly() (mitumbase.Addr
 }
 
 type RegisterModel struct {
-	common.BaseOperation
-	*extras.BaseOperationExtensions
+	extras.ExtendedOperation
+	//common.BaseOperation
+	//*extras.BaseOperationExtensions
 }
 
 func NewRegisterModel(fact RegisterModelFact) (RegisterModel, error) {
 	return RegisterModel{
-		BaseOperation:           common.NewBaseOperation(RegisterModelHint, fact),
-		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+		ExtendedOperation: extras.NewExtendedOperation(RegisterModelHint, fact),
+		//BaseOperation:           common.NewBaseOperation(RegisterModelHint, fact),
+		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
 
-func (op RegisterModel) IsValid(networkID []byte) error {
-	if err := op.BaseOperation.IsValid(networkID); err != nil {
-		return err
-	}
-	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-		return err
-	}
-
-	return nil
-}
+//func (op RegisterModel) IsValid(networkID []byte) error {
+//	if err := op.BaseOperation.IsValid(networkID); err != nil {
+//		return err
+//	}
+//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}
