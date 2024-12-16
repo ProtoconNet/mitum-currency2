@@ -5,12 +5,10 @@ import (
 )
 
 func (d *DIDDocument) unpack(
-	enc encoder.Encoder, context, id, created, status string, bSvc []byte,
+	enc encoder.Encoder, context, id string, bSvc []byte,
 ) error {
 	d.context_ = context
 	d.id = id
-	d.created = created
-	d.status = status
 
 	var svc Service
 	err := enc.Unmarshal(bSvc, &svc)

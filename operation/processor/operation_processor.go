@@ -514,22 +514,6 @@ func CheckDuplication(opr *OperationProcessor, op base.Operation) error {
 		duplicationTypeDIDPubKey = []string{DuplicationKey(
 			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.Sender()), DuplicationTypeDIDPubKey)}
 		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
-	case did_registry.DeactivateDID:
-		fact, ok := t.Fact().(did_registry.DeactivateDIDFact)
-		if !ok {
-			return errors.Errorf("expected %T, not %T", did_registry.DeactivateDIDFact{}, t.Fact())
-		}
-		duplicationTypeDID = DuplicationKey(
-			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.DID()), DuplicationTypeDID)
-		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
-	case did_registry.ReactivateDID:
-		fact, ok := t.Fact().(did_registry.ReactivateDIDFact)
-		if !ok {
-			return errors.Errorf("expected %T, not %T", did_registry.ReactivateDIDFact{}, t.Fact())
-		}
-		duplicationTypeDID = DuplicationKey(
-			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.DID()), DuplicationTypeDID)
-		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
 	default:
 		return nil
 	}
@@ -645,9 +629,7 @@ func GetNewProcessor(opr *OperationProcessor, op base.Operation) (base.Operation
 		extension.Withdraw,
 		did_registry.RegisterModel,
 		did_registry.CreateDID,
-		did_registry.DeactivateDID,
-		did_registry.UpdateDIDDocument,
-		did_registry.ReactivateDID:
+		did_registry.UpdateDIDDocument:
 		return nil, false, errors.Errorf("%T needs SetProcessor", t)
 	default:
 		return nil, false, nil

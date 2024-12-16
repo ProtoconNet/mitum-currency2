@@ -117,25 +117,11 @@ func (opp *UpdateDIDDocumentProcessor) PreProcess(
 			)), nil
 	}
 
-	if st, err := state.ExistsState(didstate.DocumentStateKey(fact.Contract(), fact.DID()), "did document", getStateFunc); err != nil {
+	if _, err := state.ExistsState(didstate.DocumentStateKey(fact.Contract(), fact.DID()), "did document", getStateFunc); err != nil {
 		return nil, mitumbase.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.
 				Wrap(common.ErrMStateNF).Errorf("DID document for DID %v in contract account %v", fact.DID(),
 				fact.Contract(),
-			)), nil
-	} else if d, err := didstate.GetDocumentFromState(st); err != nil {
-		return nil, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMStateValInvalid).Errorf(
-				"DID document for DID %v in contract account %v", fact.DID(),
-				fact.Contract(),
-			)), nil
-	} else if d.Status() != "1" {
-		return nil, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMValueInvalid).Errorf(
-				"DID document for DID %v in contract account %v is not in active status",
-				fact.DID(), fact.Contract(),
 			)), nil
 	}
 

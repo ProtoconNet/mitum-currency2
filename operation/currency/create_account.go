@@ -217,50 +217,10 @@ func (fact CreateAccountFact) FactUser() base.Address {
 
 type CreateAccount struct {
 	extras.ExtendedOperation
-	//common.BaseOperation
-	//*extras.BaseOperationExtensions
 }
 
 func NewCreateAccount(fact CreateAccountFact) (CreateAccount, error) {
 	return CreateAccount{
 		ExtendedOperation: extras.NewExtendedOperation(CreateAccountHint, fact),
-		//BaseOperation:           common.NewBaseOperation(CreateAccountHint, fact),
-		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
-
-//func (op CreateAccount) IsValid(networkID []byte) error {
-//	if err := op.BaseOperation.IsValid(networkID); err != nil {
-//		return err
-//	}
-//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
-
-//func (op *CreateAccount) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
-//	err := op.Sign(priv, networkID)
-//	if err != nil {
-//		return err
-//	}
-//
-//	op.SetHash(op.hash())
-//	return nil
-//}
-//
-//func (op CreateAccount) hash() util.Hash {
-//	return valuehash.NewSHA256(op.HashBytes())
-//}
-//
-//func (op CreateAccount) HashBytes() []byte {
-//	var bs [][]byte
-//	bs = append(bs, op.BaseOperation.HashBytes())
-//
-//	if op.BaseOperationExtensions != nil {
-//		bs = append(bs, op.BaseOperationExtensions.Bytes())
-//	}
-//
-//	return util.ConcatBytesSlice(bs...)
-//}

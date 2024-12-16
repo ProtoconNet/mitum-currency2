@@ -12,22 +12,18 @@ type DIDDocument struct {
 	hint.BaseHinter
 	context_           string
 	id                 string
-	created            string
-	status             string
 	authentication     []IAuthentication
 	verificationMethod []IVerificationMethod
 	service            Service
 }
 
 func NewDIDDocument(
-	did, created, status string, auth []IAuthentication, vrf []IVerificationMethod, service Service,
+	did string, auth []IAuthentication, vrf []IVerificationMethod, service Service,
 ) DIDDocument {
 	return DIDDocument{
 		BaseHinter:         hint.NewBaseHinter(DIDDocumentHint),
 		context_:           "https://www.w3.org/ns/did/v1",
 		id:                 did,
-		created:            created,
-		status:             status,
 		authentication:     auth,
 		verificationMethod: vrf,
 		service:            service,
@@ -69,8 +65,6 @@ func (d DIDDocument) Bytes() []byte {
 	return util.ConcatBytesSlice(
 		[]byte(d.context_),
 		[]byte(d.id),
-		[]byte(d.created),
-		[]byte(d.status),
 		byteAuth,
 		byteVrf,
 		d.service.Bytes(),
@@ -79,10 +73,6 @@ func (d DIDDocument) Bytes() []byte {
 
 func (d DIDDocument) DID() string {
 	return d.id
-}
-
-func (d DIDDocument) Status() string {
-	return d.status
 }
 
 func (d DIDDocument) Authentication(id string) (IAuthentication, error) {
@@ -103,10 +93,6 @@ func (d DIDDocument) VerificationMethod(id string) (IVerificationMethod, error) 
 	}
 
 	return nil, errors.Errorf("VerificationMethod not found by id %v", id)
-}
-
-func (d *DIDDocument) SetStatus(status string) {
-	d.status = status
 }
 
 type Service struct {

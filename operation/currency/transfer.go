@@ -188,34 +188,10 @@ func (fact TransferFact) FactUser() base.Address {
 
 type Transfer struct {
 	extras.ExtendedOperation
-	//common.BaseOperation
-	//*extras.BaseOperationExtensions
 }
 
 func NewTransfer(fact base.Fact) (Transfer, error) {
 	return Transfer{
 		ExtendedOperation: extras.NewExtendedOperation(TransferHint, fact),
-		//BaseOperation:           common.NewBaseOperation(TransferHint, fact),
-		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
-
-//func (op *Transfer) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
-//	err := op.Sign(priv, networkID)
-//	if err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
-//
-//func (op Transfer) IsValid(networkID []byte) error {
-//	if err := op.BaseOperation.IsValid(networkID); err != nil {
-//		return err
-//	}
-//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}
