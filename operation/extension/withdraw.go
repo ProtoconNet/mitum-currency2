@@ -184,33 +184,35 @@ func (fact WithdrawFact) FactUser() base.Address {
 }
 
 type Withdraw struct {
-	common.BaseOperation
-	*extras.BaseOperationExtensions
+	extras.ExtendedOperation
+	//common.BaseOperation
+	//*extras.BaseOperationExtensions
 }
 
 func NewWithdraw(fact WithdrawFact) (Withdraw, error) {
 	return Withdraw{
-		BaseOperation:           common.NewBaseOperation(WithdrawHint, fact),
-		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+		ExtendedOperation: extras.NewExtendedOperation(WithdrawHint, fact),
+		//BaseOperation:           common.NewBaseOperation(WithdrawHint, fact),
+		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
 
-func (op *Withdraw) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
-	err := op.Sign(priv, networkID)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (op Withdraw) IsValid(networkID []byte) error {
-	if err := op.BaseOperation.IsValid(networkID); err != nil {
-		return err
-	}
-	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-		return err
-	}
-
-	return nil
-}
+//func (op *Withdraw) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
+//	err := op.Sign(priv, networkID)
+//	if err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}
+//
+//func (op Withdraw) IsValid(networkID []byte) error {
+//	if err := op.BaseOperation.IsValid(networkID); err != nil {
+//		return err
+//	}
+//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}

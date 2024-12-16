@@ -368,6 +368,55 @@ func (bs BaseProxyPayer) Equal(b BaseProxyPayer) bool {
 	return true
 }
 
+type ExtendedOperation struct {
+	common.BaseOperation
+	*BaseOperationExtensions
+}
+
+func NewExtendedOperation(hint hint.Hint, fact base.Fact) ExtendedOperation {
+	return ExtendedOperation{
+		BaseOperation:           common.NewBaseOperation(hint, fact),
+		BaseOperationExtensions: NewBaseOperationExtensions(),
+	}
+}
+
+func (op ExtendedOperation) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (op *ExtendedOperation) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
+	err := op.Sign(priv, networkID)
+	if err != nil {
+		return err
+	}
+
+	op.SetHash(op.hash())
+
+	return nil
+}
+
+func (op ExtendedOperation) hash() util.Hash {
+	return valuehash.NewSHA256(op.HashBytes())
+}
+
+func (op ExtendedOperation) HashBytes() []byte {
+	var bs [][]byte
+	bs = append(bs, op.BaseOperation.HashBytes())
+
+	if op.BaseOperationExtensions != nil {
+		bs = append(bs, op.BaseOperationExtensions.Bytes())
+	}
+
+	return util.ConcatBytesSlice(bs...)
+}
+
 type OperationExtension interface {
 	ExtType() string
 	Verify(base.Operation, base.GetStateFunc) error

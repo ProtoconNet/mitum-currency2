@@ -205,32 +205,34 @@ func (fact CreateContractAccountFact) Rebuild() CreateContractAccountFact {
 }
 
 type CreateContractAccount struct {
-	common.BaseOperation
-	*extras.BaseOperationExtensions
+	extras.ExtendedOperation
+	//common.BaseOperation
+	//*extras.BaseOperationExtensions
 }
 
 func NewCreateContractAccount(fact CreateContractAccountFact) (CreateContractAccount, error) {
 	return CreateContractAccount{
-		BaseOperation:           common.NewBaseOperation(CreateContractAccountHint, fact),
-		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+		ExtendedOperation: extras.NewExtendedOperation(CreateContractAccountHint, fact),
+		//BaseOperation:           common.NewBaseOperation(CreateContractAccountHint, fact),
+		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
 
-func (op *CreateContractAccount) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
-	err := op.Sign(priv, networkID)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (op CreateContractAccount) IsValid(networkID []byte) error {
-	if err := op.BaseOperation.IsValid(networkID); err != nil {
-		return err
-	}
-	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-		return err
-	}
-
-	return nil
-}
+//func (op *CreateContractAccount) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
+//	err := op.Sign(priv, networkID)
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}
+//
+//func (op CreateContractAccount) IsValid(networkID []byte) error {
+//	if err := op.BaseOperation.IsValid(networkID); err != nil {
+//		return err
+//	}
+//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}
