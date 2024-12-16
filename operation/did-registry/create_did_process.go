@@ -128,7 +128,7 @@ func (opp *CreateDIDProcessor) Process( // nolint:dupl
 	authentication := types.NewAsymmetricKeyAuthentication(didr.DIDUrl(), fact.authType, didData.DID(), fact.PublicKey())
 	svc := types.NewService(didData.DID(), fact.ServiceType(), fact.ServiceEndpoint())
 
-	didDocument := types.NewDIDDocument(didData.DID(), fact.Hash().String(), "1",
+	didDocument := types.NewDIDDocument(didData.DID(),
 		[]types.IAuthentication{authentication}, []types.IVerificationMethod{}, svc)
 	if err := didDocument.IsValid(nil); err != nil {
 		return nil, mitumbase.NewBaseOperationProcessReasonError("invalid did document; %w", err), nil

@@ -121,32 +121,10 @@ func (fact UpdateKeyFact) FactUser() base.Address {
 
 type UpdateKey struct {
 	extras.ExtendedOperation
-	//common.BaseOperation
-	//*extras.BaseOperationExtensions
 }
 
 func NewUpdateKey(fact UpdateKeyFact) (UpdateKey, error) {
 	return UpdateKey{
 		ExtendedOperation: extras.NewExtendedOperation(UpdateKeyHint, fact),
-		//BaseOperation: common.NewBaseOperation(UpdateKeyHint, fact)
 	}, nil
 }
-
-//func (op *UpdateKey) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
-//	err := op.Sign(priv, networkID)
-//	if err != nil {
-//		return err
-//	}
-//	return nil
-//}
-//
-//func (op UpdateKey) IsValid(networkID []byte) error {
-//	if err := op.BaseOperation.IsValid(networkID); err != nil {
-//		return err
-//	}
-//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}

@@ -14,8 +14,6 @@ func (d DIDDocument) MarshalBSON() ([]byte, error) {
 		"_hint":              d.Hint().String(),
 		"@context":           d.context_,
 		"id":                 d.id,
-		"created":            d.created,
-		"status":             d.status,
 		"authentication":     d.authentication,
 		"verificationMethod": d.verificationMethod,
 		"service":            d.service,
@@ -26,8 +24,6 @@ type DIDDocumentBSONUnmarshaler struct {
 	Hint      string   `bson:"_hint"`
 	Context_  string   `bson:"@context"`
 	ID        string   `bson:"id"`
-	Created   string   `bson:"created"`
-	Status    string   `bson:"status"`
 	Auth      bson.Raw `bson:"authentication"`
 	VRFMethod bson.Raw `bson:"verificationMethod"`
 	Service   bson.Raw `bson:"service"`
@@ -105,7 +101,7 @@ func (d *DIDDocument) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 	}
 	d.verificationMethod = vrfs
 
-	return d.unpack(enc, u.Context_, u.ID, u.Created, u.Status, u.Service)
+	return d.unpack(enc, u.Context_, u.ID, u.Service)
 }
 
 func (d Service) MarshalBSON() ([]byte, error) {

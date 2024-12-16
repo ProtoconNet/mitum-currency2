@@ -159,33 +159,10 @@ func (fact UpdateHandlerFact) ContractOwnerOnly() (base.Address, base.Address) {
 
 type UpdateHandler struct {
 	extras.ExtendedOperation
-	//common.BaseOperation
-	//*extras.BaseOperationExtensions
 }
 
 func NewUpdateHandler(fact UpdateHandlerFact) (UpdateHandler, error) {
 	return UpdateHandler{
 		ExtendedOperation: extras.NewExtendedOperation(UpdateHandlerHint, fact),
-		//BaseOperation:           common.NewBaseOperation(UpdateHandlerHint, fact),
-		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
-
-//func (op *UpdateHandler) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
-//	err := op.Sign(priv, networkID)
-//	if err != nil {
-//		return err
-//	}
-//	return nil
-//}
-//
-//func (op UpdateHandler) IsValid(networkID []byte) error {
-//	if err := op.BaseOperation.IsValid(networkID); err != nil {
-//		return err
-//	}
-//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}

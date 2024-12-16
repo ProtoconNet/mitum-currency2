@@ -152,25 +152,10 @@ func (fact CreateDIDFact) ActiveContract() mitumbase.Address {
 
 type CreateDID struct {
 	extras.ExtendedOperation
-	//common.BaseOperation
-	//*extras.BaseOperationExtensions
 }
 
 func NewCreateDID(fact CreateDIDFact) (CreateDID, error) {
 	return CreateDID{
 		ExtendedOperation: extras.NewExtendedOperation(CreateDIDHint, fact),
-		//BaseOperation:           common.NewBaseOperation(CreateDIDHint, fact),
-		//BaseOperationExtensions: extras.NewBaseOperationExtensions(),
 	}, nil
 }
-
-//func (op CreateDID) IsValid(networkID []byte) error {
-//	if err := op.BaseOperation.IsValid(networkID); err != nil {
-//		return err
-//	}
-//	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}

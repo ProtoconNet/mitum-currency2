@@ -100,8 +100,6 @@ var AddedHinters = []encoder.DecodeDetail{
 	{Hint: types.SocialLogInAuthenticationHint, Instance: types.SocialLogInAuthentication{}},
 
 	{Hint: did_registry.CreateDIDHint, Instance: did_registry.CreateDID{}},
-	{Hint: did_registry.ReactivateDIDHint, Instance: did_registry.ReactivateDID{}},
-	{Hint: did_registry.DeactivateDIDHint, Instance: did_registry.DeactivateDID{}},
 	{Hint: did_registry.UpdateDIDDocumentHint, Instance: did_registry.UpdateDIDDocument{}},
 	{Hint: did_registry.RegisterModelHint, Instance: did_registry.RegisterModel{}},
 	{Hint: statedid.DataStateValueHint, Instance: statedid.DataStateValue{}},
@@ -130,9 +128,7 @@ var AddedSupportedHinters = []encoder.DecodeDetail{
 	{Hint: isaacoperation.NetworkPolicyFactHint, Instance: isaacoperation.NetworkPolicyFact{}},
 
 	{Hint: did_registry.CreateDIDFactHint, Instance: did_registry.CreateDIDFact{}},
-	{Hint: did_registry.ReactivateDIDFactHint, Instance: did_registry.ReactivateDIDFact{}},
 	{Hint: did_registry.UpdateDIDDocumentFactHint, Instance: did_registry.UpdateDIDDocumentFact{}},
-	{Hint: did_registry.DeactivateDIDFactHint, Instance: did_registry.DeactivateDIDFact{}},
 	{Hint: did_registry.RegisterModelFactHint, Instance: did_registry.RegisterModelFact{}},
 }
 

@@ -12,8 +12,6 @@ type DIDDocumentJSONMarshaler struct {
 	hint.BaseHinter
 	Context_  string                `json:"@context"`
 	ID        string                `json:"id"`
-	Created   string                `json:"created"`
-	Status    string                `json:"status"`
 	Auth      []IAuthentication     `json:"authentication"`
 	VRFMethod []IVerificationMethod `json:"verificationMethod"`
 	Service   Service               `json:"service"`
@@ -24,8 +22,6 @@ func (d DIDDocument) MarshalJSON() ([]byte, error) {
 		BaseHinter: d.BaseHinter,
 		Context_:   d.context_,
 		ID:         d.id,
-		Created:    d.created,
-		Status:     d.status,
 		Auth:       d.authentication,
 		VRFMethod:  d.verificationMethod,
 		Service:    d.service,
@@ -36,8 +32,6 @@ type DIDDocumentJSONUnmarshaler struct {
 	Hint      hint.Hint       `json:"_hint"`
 	Context_  string          `json:"@context"`
 	ID        string          `json:"id"`
-	Created   string          `json:"created"`
-	Status    string          `json:"status"`
 	Auth      json.RawMessage `json:"authentication"`
 	VRFMethod json.RawMessage `json:"verificationMethod"`
 	Service   json.RawMessage `json:"service"`
@@ -110,7 +104,7 @@ func (d *DIDDocument) DecodeJSON(b []byte, enc encoder.Encoder) error {
 
 	}
 	d.verificationMethod = vrfs
-	err = d.unpack(enc, u.Context_, u.ID, u.Created, u.Status, u.Service)
+	err = d.unpack(enc, u.Context_, u.ID, u.Service)
 	if err != nil {
 		return err
 	}

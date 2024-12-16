@@ -122,16 +122,6 @@ func POperationProcessorsMap(pctx context.Context) (context.Context, error) {
 	); err != nil {
 		return pctx, err
 	} else if err := opr.SetProcessor(
-		did.ReactivateDIDHint,
-		did.NewReactivateDIDProcessor(),
-	); err != nil {
-		return pctx, err
-	} else if err := opr.SetProcessor(
-		did.DeactivateDIDHint,
-		did.NewDeactivateDIDProcessor(),
-	); err != nil {
-		return pctx, err
-	} else if err := opr.SetProcessor(
 		did.UpdateDIDDocumentHint,
 		did.NewUpdateDIDDocumentProcessor(),
 	); err != nil {
@@ -248,24 +238,6 @@ func POperationProcessorsMap(pctx context.Context) (context.Context, error) {
 	})
 
 	_ = setA.Add(did.RegisterModelHint, func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
-		return opr.New(
-			height,
-			getStatef,
-			nil,
-			nil,
-		)
-	})
-
-	_ = setA.Add(did.ReactivateDIDHint, func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
-		return opr.New(
-			height,
-			getStatef,
-			nil,
-			nil,
-		)
-	})
-
-	_ = setA.Add(did.DeactivateDIDHint, func(height base.Height, getStatef base.GetStateFunc) (base.OperationProcessor, error) {
 		return opr.New(
 			height,
 			getStatef,
