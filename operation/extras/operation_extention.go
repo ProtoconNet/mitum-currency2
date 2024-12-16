@@ -39,7 +39,7 @@ type ProxyPayer interface {
 }
 
 var BaseAuthenticationHint = hint.MustNewHint("mitum-extension-base-authentication-v0.0.1")
-var AuthenticationExtensionType string = "Authentication"
+var AuthenticationExtensionType string = "authentication"
 
 type BaseAuthentication struct {
 	hint.BaseHinter
@@ -225,7 +225,7 @@ func (ba BaseAuthentication) Verify(op base.Operation, getStateFunc base.GetStat
 }
 
 var BaseSettlementHint = hint.MustNewHint("mitum-extension-base-settlement-v0.0.1")
-var SettlementExtensionType string = "Settlement"
+var SettlementExtensionType string = "settlement"
 
 type BaseSettlement struct {
 	hint.BaseHinter
@@ -291,7 +291,7 @@ func (bs BaseSettlement) Equal(b BaseSettlement) bool {
 }
 
 var BaseProxyPayerHint = hint.MustNewHint("mitum-extension-base-proxy-payer-v0.0.1")
-var ProxyPayerExtensionType string = "ProxyPayer"
+var ProxyPayerExtensionType string = "proxyPayer"
 
 type BaseProxyPayer struct {
 	hint.BaseHinter
