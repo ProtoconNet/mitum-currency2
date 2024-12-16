@@ -2,6 +2,7 @@ package extension
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -137,19 +138,35 @@ func (fact UpdateHandlerFact) Addresses() ([]base.Address, error) {
 	return as, nil
 }
 
-func (fact UpdateHandlerFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+func (fact UpdateHandlerFact) FeeBase() map[types.CurrencyID][]common.Big {
 	required := make(map[types.CurrencyID][]common.Big)
 	required[fact.Currency()] = []common.Big{common.ZeroBig}
 
-	return required, fact.Sender()
+	return required
+}
+
+func (fact UpdateHandlerFact) FeePayer() base.Address {
+	return fact.sender
+}
+
+func (fact UpdateHandlerFact) FactUser() base.Address {
+	return fact.sender
+}
+
+func (fact UpdateHandlerFact) ContractOwnerOnly() (base.Address, base.Address) {
+	return fact.contract, fact.sender
 }
 
 type UpdateHandler struct {
 	common.BaseOperation
+	*extras.BaseOperationExtensions
 }
 
 func NewUpdateHandler(fact UpdateHandlerFact) (UpdateHandler, error) {
-	return UpdateHandler{BaseOperation: common.NewBaseOperation(UpdateHandlerHint, fact)}, nil
+	return UpdateHandler{
+		BaseOperation:           common.NewBaseOperation(UpdateHandlerHint, fact),
+		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+	}, nil
 }
 
 func (op *UpdateHandler) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
@@ -157,5 +174,16 @@ func (op *UpdateHandler) HashSign(priv base.Privatekey, networkID base.NetworkID
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (op UpdateHandler) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
 	return nil
 }

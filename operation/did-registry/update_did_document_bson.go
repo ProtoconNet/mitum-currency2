@@ -1,6 +1,7 @@
 package did_registry
 
 import (
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -86,6 +87,13 @@ func (op *UpdateDIDDocument) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 	}
 
 	op.BaseOperation = ubo
+
+	var ueo extras.BaseOperationExtensions
+	if err := ueo.DecodeBSON(b, enc); err != nil {
+		return common.DecorateError(err, common.ErrDecodeBson, *op)
+	}
+
+	op.BaseOperationExtensions = &ueo
 
 	return nil
 }

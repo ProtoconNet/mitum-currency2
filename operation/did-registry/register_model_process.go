@@ -2,9 +2,9 @@ package did_registry
 
 import (
 	"context"
+	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"sync"
 
-	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum-currency/v3/state"
 	didstate "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
 	stateextension "github.com/ProtoconNet/mitum-currency/v3/state/extension"
@@ -74,41 +74,6 @@ func (opp *RegisterModelProcessor) PreProcess(
 	if err := state.CheckExistsState(statecurrency.DesignStateKey(fact.Currency()), getStateFunc); err != nil {
 		return ctx, mitumbase.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.Wrap(common.ErrMCurrencyNF).Errorf("currency id, %v", fact.Currency())), nil
-	}
-
-	if _, _, aErr, cErr := state.ExistsCAccount(fact.Sender(), "sender", true, false, getStateFunc); aErr != nil {
-		return ctx, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", aErr)), nil
-	} else if cErr != nil {
-		return ctx, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.Wrap(common.ErrMCAccountNA).
-				Errorf("%v", cErr)), nil
-	}
-
-	_, cSt, aErr, cErr := state.ExistsCAccount(fact.Contract(), "contract", true, true, getStateFunc)
-	if aErr != nil {
-		return ctx, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", aErr)), nil
-	} else if cErr != nil {
-		return ctx, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", cErr)), nil
-	}
-
-	ca, err := stateextension.CheckCAAuthFromState(cSt, fact.Sender())
-	if err != nil {
-		return ctx, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", err)), nil
-	}
-
-	if ca.IsActive() {
-		return nil, mitumbase.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMServiceE).Errorf(
-				"contract account %v has already been activated", fact.Contract())), nil
 	}
 
 	if found, _ := state.CheckNotExistsState(didstate.DesignStateKey(fact.Contract()), getStateFunc); found {

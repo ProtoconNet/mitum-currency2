@@ -3,6 +3,7 @@ package extension
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -154,7 +155,7 @@ func (fact CreateContractAccountFact) Addresses() ([]base.Address, error) {
 	return as, nil
 }
 
-func (fact CreateContractAccountFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+func (fact CreateContractAccountFact) FeeBase() map[types.CurrencyID][]common.Big {
 	required := make(map[types.CurrencyID][]common.Big)
 	items := make([]currency.AmountsItem, len(fact.items))
 	for i := range fact.items {
@@ -179,7 +180,15 @@ func (fact CreateContractAccountFact) FeeBase() (map[types.CurrencyID][]common.B
 		}
 	}
 
-	return required, fact.Sender()
+	return required
+}
+
+func (fact CreateContractAccountFact) FeePayer() base.Address {
+	return fact.sender
+}
+
+func (fact CreateContractAccountFact) FactUser() base.Address {
+	return fact.sender
 }
 
 func (fact CreateContractAccountFact) Rebuild() CreateContractAccountFact {
@@ -197,10 +206,14 @@ func (fact CreateContractAccountFact) Rebuild() CreateContractAccountFact {
 
 type CreateContractAccount struct {
 	common.BaseOperation
+	*extras.BaseOperationExtensions
 }
 
 func NewCreateContractAccount(fact CreateContractAccountFact) (CreateContractAccount, error) {
-	return CreateContractAccount{BaseOperation: common.NewBaseOperation(CreateContractAccountHint, fact)}, nil
+	return CreateContractAccount{
+		BaseOperation:           common.NewBaseOperation(CreateContractAccountHint, fact),
+		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+	}, nil
 }
 
 func (op *CreateContractAccount) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
@@ -208,5 +221,16 @@ func (op *CreateContractAccount) HashSign(priv base.Privatekey, networkID base.N
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (op CreateContractAccount) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -2,6 +2,7 @@ package currency // nolint: dupl
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"go.mongodb.org/mongo-driver/bson"
 
 	bsonenc "github.com/ProtoconNet/mitum-currency/v3/digest/util/bson"
@@ -62,12 +63,18 @@ func (fact *TransferFact) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 }
 
 func (op Transfer) MarshalBSON() ([]byte, error) {
+	bm := bson.M{}
+	for k, v := range op.Extensions() {
+		bm[k] = v
+	}
+
 	return bsonenc.Marshal(
 		bson.M{
-			"_hint": op.Hint().String(),
-			"hash":  op.Hash(),
-			"fact":  op.Fact(),
-			"signs": op.Signs(),
+			"_hint":     op.Hint().String(),
+			"hash":      op.Hash().String(),
+			"fact":      op.Fact(),
+			"signs":     op.Signs(),
+			"extension": bm,
 		})
 }
 
@@ -78,6 +85,13 @@ func (op *Transfer) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 	}
 
 	op.BaseOperation = ubo
+
+	var ueo extras.BaseOperationExtensions
+	if err := ueo.DecodeBSON(b, enc); err != nil {
+		return common.DecorateError(err, common.ErrDecodeBson, *op)
+	}
+
+	op.BaseOperationExtensions = &ueo
 
 	return nil
 }

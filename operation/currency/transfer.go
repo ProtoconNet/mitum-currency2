@@ -2,6 +2,7 @@ package currency
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -149,7 +150,7 @@ func (fact TransferFact) Addresses() ([]base.Address, error) {
 	return as, nil
 }
 
-func (fact TransferFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+func (fact TransferFact) FeeBase() map[types.CurrencyID][]common.Big {
 	required := make(map[types.CurrencyID][]common.Big)
 	items := make([]AmountsItem, len(fact.items))
 	for i := range fact.items {
@@ -163,26 +164,38 @@ func (fact TransferFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Addr
 			am := amounts[j]
 			cid := am.Currency()
 			big := am.Big()
-			var k []common.Big
-			if arr, found := required[cid]; found {
-				arr = append(arr, big)
-				copy(k, arr)
+			var amsTemp []common.Big
+			if ams, found := required[cid]; found {
+				ams = append(ams, big)
+				required[cid] = ams
 			} else {
-				k = append(k, big)
+				amsTemp = append(amsTemp, big)
+				required[cid] = amsTemp
 			}
-			required[cid] = k
 		}
 	}
 
-	return required, fact.Sender()
+	return required
+}
+
+func (fact TransferFact) FeePayer() base.Address {
+	return fact.sender
+}
+
+func (fact TransferFact) FactUser() base.Address {
+	return fact.sender
 }
 
 type Transfer struct {
 	common.BaseOperation
+	*extras.BaseOperationExtensions
 }
 
-func NewTransfer(fact TransferFact) (Transfer, error) {
-	return Transfer{BaseOperation: common.NewBaseOperation(TransferHint, fact)}, nil
+func NewTransfer(fact base.Fact) (Transfer, error) {
+	return Transfer{
+		BaseOperation:           common.NewBaseOperation(TransferHint, fact),
+		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+	}, nil
 }
 
 func (op *Transfer) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
@@ -190,5 +203,17 @@ func (op *Transfer) HashSign(priv base.Privatekey, networkID base.NetworkID) err
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (op Transfer) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -3,8 +3,7 @@ package processor
 import (
 	"context"
 	"fmt"
-	didstate "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
-	"github.com/btcsuite/btcutil/base58"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"io"
 	"sync"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/state"
 	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
-	stateextention "github.com/ProtoconNet/mitum-currency/v3/state/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -211,6 +209,33 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 		opp = i
 	}
 
+	if fact, ok := op.(extras.FactUser); ok {
+		if err := extras.VerifyFactUser(fact.FactUser(), getStateFunc); err != nil {
+			return ctx, err, nil
+		}
+	}
+
+	if fact, ok := op.(extras.InActiveContractOwnerHandlerOnly); ok {
+		contract, sender := fact.InActiveContractOwnerHandlerOnly()
+		if err := extras.VerifyInActiveContractOwnerHandlerOnly(contract, sender, getStateFunc); err != nil {
+			return ctx, err, nil
+		}
+	}
+
+	if fact, ok := op.(extras.ContractOwnerOnly); ok {
+		contract, sender := fact.ContractOwnerOnly()
+		if err := extras.VerifyContractOwnerOnly(contract, sender, getStateFunc); err != nil {
+			return ctx, err, nil
+		}
+	}
+
+	if fact, ok := op.(extras.ActiveContract); ok {
+		contract := fact.ActiveContract()
+		if err := extras.VerifyActiveContract(contract, getStateFunc); err != nil {
+			return ctx, err, nil
+		}
+	}
+
 	switch _, reasonErr, err := opp.PreProcess(ctx, op, getStateFunc); {
 	case err != nil:
 		return ctx, nil, e.Wrap(err)
@@ -218,29 +243,16 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 		return ctx, reasonErr, nil
 	}
 
-	if extOp, ok := op.(common.IExtendedOperation); ok {
-		if extOp.GetAuthentication() != nil && extOp.GetSettlement() != nil {
-			auth := extOp.GetAuthentication()
-
-			if err := auth.IsValid(nil); err != nil {
-				return ctx, base.NewBaseOperationProcessReasonError(
-					common.ErrMPreProcess.Errorf("%v", err)), nil
-			}
-
-			if err := VerifyAuth(auth, op, getStateFunc); err != nil {
-				return ctx, base.NewBaseOperationProcessReasonError(
-					common.ErrMPreProcess.Errorf("%v", err)), nil
-			}
-
-			settlement := extOp.GetSettlement()
-
-			if err := settlement.IsValid(nil); err != nil {
-				return ctx, base.NewBaseOperationProcessReasonError(
-					common.ErrMPreProcess.Errorf("%v", err)), nil
-			}
-
-			opSender, _ := extOp.GetSettlement().OpSender()
-			if err := state.CheckFactSignsByState(opSender, op.Signs(), getStateFunc); err != nil {
+	if extOp, ok := op.(extras.OperationExtensions); ok {
+		if err := extOp.Verify(op, getStateFunc); err != nil {
+			return ctx, base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.Errorf("%v", err)), nil
+		}
+	} else {
+		fact := op.Fact()
+		signerFact, ok := fact.(currency.Signer)
+		if ok {
+			if err := state.CheckFactSignsByState(signerFact.Signer(), op.Signs(), getStateFunc); err != nil {
 				return ctx,
 					base.NewBaseOperationProcessReasonError(
 						common.ErrMPreProcess.
@@ -248,31 +260,7 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 							Errorf("%v", err),
 					), nil
 			}
-
-			if err := VerifyPayment(settlement, getStateFunc); err != nil {
-				return ctx, base.NewBaseOperationProcessReasonError(
-					common.ErrMPreProcess.Errorf("%v", err)), nil
-			}
-		} else {
-			fact := op.Fact()
-			signerFact, ok := fact.(currency.Signer)
-			if ok {
-				if err := state.CheckFactSignsByState(signerFact.Signer(), op.Signs(), getStateFunc); err != nil {
-					return ctx,
-						base.NewBaseOperationProcessReasonError(
-							common.ErrMPreProcess.
-								Wrap(common.ErrMSignInvalid).
-								Errorf("%v", err),
-						), nil
-				}
-			}
 		}
-	} else {
-		return ctx,
-			base.NewBaseOperationProcessReasonError(
-				common.ErrMPreProcess.
-					Errorf("%v", errors.Errorf("expected ExtendedOperation, but %T", op)),
-			), nil
 	}
 
 	return ctx, nil, nil
@@ -300,40 +288,44 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 	var isUserOperation bool
 	var payer base.Address
 	switch i := op.Fact().(type) {
-	case currency.FeeBaser:
-		m, sender := i.FeeBase()
-		payer = sender
+	case extras.FeeAble:
+		feeBase := i.FeeBase()
+		payer = i.FeePayer()
 		switch k := op.(type) {
-		case common.IExtendedOperation:
-			if k.GetAuthentication() != nil && k.GetSettlement() != nil {
+		case extras.OperationExtensions:
+			iAuth := k.Extension(extras.AuthenticationExtensionType)
+			iSettlement := k.Extension(extras.SettlementExtensionType)
+			iProxyPayer := k.Extension(extras.ProxyPayerExtensionType)
+			if iAuth != nil && iSettlement != nil {
 				isUserOperation = true
-				opSender, _ := k.OpSender()
+				settlement, ok := iSettlement.(extras.Settlement)
+				if !ok {
+					return nil, nil, e.Errorf("expected Settlement, but %T", iSettlement)
+				}
+				opSender := settlement.OpSender()
+				if opSender == nil {
+					return nil, nil, e.Errorf("empty op sender")
+				}
 				payer = opSender
-				if proxyPayer, ok := k.ProxyPayer(); ok {
-					if _, cSt, aErr, cErr := state.ExistsCAccount(proxyPayer, "payer", true, true, getStateFunc); aErr != nil {
-						return nil, base.NewBaseOperationProcessReasonError(
-							common.ErrMPreProcess.Errorf("%v", aErr)), nil
-					} else if cErr != nil {
-						return nil, base.NewBaseOperationProcessReasonError(
-							common.ErrMPreProcess.Errorf("%v", cErr)), nil
-					} else if ca, err := stateextention.LoadCAStateValue(cSt); err != nil {
-						return nil, base.NewBaseOperationProcessReasonError(
-							common.ErrMPreProcess.Errorf("%v", err)), nil
-					} else if ca.IsRecipients(sender) {
-						payer = proxyPayer
-					} else {
-						return nil, base.NewBaseOperationProcessReasonError(
-							common.ErrMPreProcess.Errorf("user is not recipient of proxy payer")), nil
-					}
+			}
+			if iProxyPayer != nil {
+				proxyPayer, ok := iProxyPayer.(extras.ProxyPayer)
+				if !ok {
+					return nil, nil, e.Errorf("expected ProxyPayer, but %T", iProxyPayer)
+				}
+
+				if proxyPayer := proxyPayer.ProxyPayer(); proxyPayer != nil {
+					payer = proxyPayer
 				}
 			}
 		default:
 		}
 
 		feeReceiveSts := map[types.CurrencyID]base.State{}
-		var sendAmount = make(map[types.CurrencyID]common.Big)
+		var sendRequired = make(map[types.CurrencyID]common.Big)
 		var feeRequired = make(map[types.CurrencyID]common.Big)
-		for cid, amounts := range m {
+
+		for cid, amounts := range feeBase {
 			policy, err := state.ExistsCurrencyPolicy(cid, getStateFunc)
 			if err != nil {
 				return nil, nil, err
@@ -369,48 +361,43 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 			} else {
 				feeRequired[cid] = v.Add(rq)
 			}
-			sendAmount[cid] = total
+			sendRequired[cid] = total
 		}
 
 		for cid, rq := range feeRequired {
-			st, err := state.ExistsState(statecurrency.BalanceStateKey(payer, cid), fmt.Sprintf("balance of fee payer, %v", payer), getStateFunc)
+			payerSt, err := state.ExistsState(statecurrency.BalanceStateKey(payer, cid), fmt.Sprintf("balance of fee payer, %v", payer), getStateFunc)
 			if err != nil {
 				return nil, nil, e.Wrap(err)
 			}
 
-			v, ok := st.Value().(statecurrency.BalanceStateValue)
+			payerBalValue, ok := payerSt.Value().(statecurrency.BalanceStateValue)
 			if !ok {
 				return nil, base.NewBaseOperationProcessReasonError(
 					"expected %T, not %T",
 					statecurrency.BalanceStateValue{},
-					st.Value(),
+					payerSt.Value(),
 				), nil
 			}
 
-			am, err := statecurrency.StateBalanceValue(st)
-			if err != nil {
-				return nil, nil, e.Wrap(err)
-			}
-
 			if !isUserOperation {
-				reg := sendAmount[cid].Add(rq)
-				if am.Big().Compare(reg) < 0 {
+				req := sendRequired[cid].Add(rq)
+				if payerBalValue.Amount.Big().Compare(req) < 0 {
 					return nil, base.NewBaseOperationProcessReasonError(
-						"account, %s balance insufficient; %d < required %d", payer.String(), am.Big(), rq), nil
+						"account, %s balance insufficient; %d < required %d", payer.String(), payerBalValue.Amount.Big(), rq), nil
 				}
 			} else {
-				if am.Big().Compare(rq) < 0 {
+				if payerBalValue.Amount.Big().Compare(rq) < 0 {
 					return nil, base.NewBaseOperationProcessReasonError(
-						"account, %s balance insufficient; %d < required %d", payer.String(), am.Big(), rq), nil
+						"account, %s balance insufficient; %d < required %d", payer.String(), payerBalValue.Amount.Big(), rq), nil
 				}
 			}
 
-			_, feeReceiverFound := feeReceiveSts[cid]
+			feeReceiverSt, feeReceiverFound := feeReceiveSts[cid]
 			if feeReceiverFound {
-				if st.Key() != feeReceiveSts[cid].Key() {
+				if payerSt.Key() != feeReceiverSt.Key() {
 					stateMergeValues = append(stateMergeValues, common.NewBaseStateMergeValue(
-						st.Key(),
-						statecurrency.NewDeductBalanceStateValue(v.Amount.WithBig(rq)),
+						payerSt.Key(),
+						statecurrency.NewDeductBalanceStateValue(payerBalValue.Amount.WithBig(rq)),
 						func(height base.Height, st base.State) base.StateValueMerger {
 							return statecurrency.NewBalanceStateValueMerger(height, st.Key(), cid, st)
 						},
@@ -733,127 +720,4 @@ func (opr *OperationProcessor) close() {
 	operationProcessorPool.Put(opr)
 
 	opr.Log().Debug().Msg("operation processors closed")
-}
-
-func VerifyAuth(ba common.Authentication, op base.Operation, getStateFunc base.GetStateFunc) error {
-	var authentication types.IAuthentication
-	var doc types.DIDDocument
-	dr, err := types.NewDIDResourceFromString(ba.AuthenticationID())
-	if err != nil {
-		return err
-	}
-
-	contract, ok := ba.Contract()
-	if !ok {
-		return errors.Errorf("empty contract address")
-	}
-	if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
-		return err
-	} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
-		return err
-	}
-
-	authentication, err = doc.Authentication(ba.AuthenticationID())
-	if err != nil {
-		return err
-	}
-
-	if authentication.Controller() != dr.DID() {
-		return errors.Errorf(
-			"Controller of authentication id, %v is not matched with DID in document, %v",
-			authentication.Controller(),
-			dr.DID(),
-		)
-	}
-
-	switch authentication.AuthType() {
-	case types.AuthTypeECDSASECP:
-		details := authentication.Details()
-		pubKey, ok := details.(base.Publickey)
-		if !ok {
-			return errors.Errorf("expected PublicKey, but %T", details)
-		}
-
-		signature := base58.Decode(ba.ProofData())
-		err := pubKey.Verify(op.Fact().Hash().Bytes(), signature)
-		if err != nil {
-			return err
-		}
-	case types.AuthTypeVC:
-		details := authentication.Details()
-		m, ok := details.(map[string]interface{})
-		if !ok {
-			return errors.Errorf("get authentication details")
-		}
-		p := m["proof"]
-		proof, ok := p.(types.Proof)
-		if !ok {
-			return errors.Errorf("get vc proof")
-		}
-		vm := proof.VerificationMethod()
-		dr, err := types.NewDIDResourceFromString(vm)
-		if err != nil {
-			return err
-		}
-
-		var doc types.DIDDocument
-		contract, _ := ba.Contract()
-		if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
-			return err
-		} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
-			return err
-		}
-
-		sAuthentication, err := doc.Authentication(vm)
-		if err != nil {
-			return err
-		}
-
-		if sAuthentication.Controller() != dr.DID() {
-			return errors.Errorf(
-				"Controller of authentication id, %v is not matched with DID in document, %v", authentication.Controller(), dr.DID())
-		}
-
-		if sAuthentication.AuthType() != types.AuthTypeECDSASECP {
-			return errors.Errorf("auth type must be EcdsaSecp256k1VerificationKey2019")
-		}
-
-		sDetails := sAuthentication.Details()
-		pubKey, ok := sDetails.(base.Publickey)
-		if !ok {
-			return errors.Errorf("expected PublicKey, but %T", details)
-		}
-
-		signature := base58.Decode(ba.ProofData())
-
-		err = pubKey.Verify(op.Fact().Hash().Bytes(), signature)
-		if err != nil {
-			return errors.Errorf("signature verification failed, %v", err)
-		}
-	default:
-	}
-
-	return nil
-}
-
-func VerifyPayment(ba common.Settlement, getStateFunc base.GetStateFunc) error {
-	opSender, ok := ba.OpSender()
-	if !ok {
-		return errors.Errorf("empty op sender")
-	}
-	if _, _, aErr, cErr := state.ExistsCAccount(opSender, "op sender", true, false, getStateFunc); aErr != nil {
-		return aErr
-	} else if cErr != nil {
-		return cErr
-	}
-
-	proxyPayer, ok := ba.ProxyPayer()
-	if ok {
-		if _, _, aErr, cErr := state.ExistsCAccount(proxyPayer, "proxy payer", true, true, getStateFunc); aErr != nil {
-			return aErr
-		} else if cErr != nil {
-			return cErr
-		}
-	}
-	return nil
 }

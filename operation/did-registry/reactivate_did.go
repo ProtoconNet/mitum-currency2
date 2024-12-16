@@ -2,6 +2,7 @@ package did_registry
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	currencytypes "github.com/ProtoconNet/mitum-currency/v3/types"
 	mitumbase "github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -109,17 +110,44 @@ func (fact ReactivateDIDFact) Addresses() ([]mitumbase.Address, error) {
 	return as, nil
 }
 
-func (fact ReactivateDIDFact) FeeBase() (map[currencytypes.CurrencyID][]common.Big, mitumbase.Address) {
+func (fact ReactivateDIDFact) FeeBase() map[currencytypes.CurrencyID][]common.Big {
 	required := make(map[currencytypes.CurrencyID][]common.Big)
 	required[fact.Currency()] = []common.Big{common.ZeroBig}
 
-	return required, fact.sender
+	return required
+}
+
+func (fact ReactivateDIDFact) FeePayer() mitumbase.Address {
+	return fact.sender
+}
+
+func (fact ReactivateDIDFact) FactUser() mitumbase.Address {
+	return fact.sender
+}
+
+func (fact ReactivateDIDFact) ActiveContract() mitumbase.Address {
+	return fact.contract
 }
 
 type ReactivateDID struct {
 	common.BaseOperation
+	*extras.BaseOperationExtensions
 }
 
 func NewReactivateDID(fact ReactivateDIDFact) (ReactivateDID, error) {
-	return ReactivateDID{BaseOperation: common.NewBaseOperation(ReactivateDIDHint, fact)}, nil
+	return ReactivateDID{
+		BaseOperation:           common.NewBaseOperation(ReactivateDIDHint, fact),
+		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+	}, nil
+}
+
+func (op ReactivateDID) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
+	return nil
 }

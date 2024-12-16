@@ -2,13 +2,14 @@ package did_registry
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	mitumbase "github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/ProtoconNet/mitum2/util/encoder"
 )
 
-type CreateDIDFactJSONMarshaller struct {
+type CreateDIDFactJSONMarshaler struct {
 	mitumbase.BaseFactJSONMarshaler
 	Sender          mitumbase.Address `json:"sender"`
 	Contract        mitumbase.Address `json:"contract"`
@@ -20,7 +21,7 @@ type CreateDIDFactJSONMarshaller struct {
 }
 
 func (fact CreateDIDFact) MarshalJSON() ([]byte, error) {
-	return util.MarshalJSON(CreateDIDFactJSONMarshaller{
+	return util.MarshalJSON(CreateDIDFactJSONMarshaler{
 		BaseFactJSONMarshaler: fact.BaseFact.JSONMarshaler(),
 		Sender:                fact.sender,
 		Contract:              fact.contract,
@@ -63,10 +64,16 @@ func (fact *CreateDIDFact) DecodeJSON(b []byte, enc encoder.Encoder) error {
 	return nil
 }
 
+type OperationMarshaler struct {
+	common.BaseOperationJSONMarshaler
+	extras.BaseOperationExtensionsJSONMarshaler
+}
+
 func (op CreateDID) MarshalJSON() ([]byte, error) {
-	return util.MarshalJSON(
-		op.BaseOperation.JSONMarshaler(),
-	)
+	return util.MarshalJSON(OperationMarshaler{
+		BaseOperationJSONMarshaler:           op.BaseOperation.JSONMarshaler(),
+		BaseOperationExtensionsJSONMarshaler: op.BaseOperationExtensions.JSONMarshaler(),
+	})
 }
 
 func (op *CreateDID) DecodeJSON(b []byte, enc encoder.Encoder) error {
@@ -76,6 +83,13 @@ func (op *CreateDID) DecodeJSON(b []byte, enc encoder.Encoder) error {
 	}
 
 	op.BaseOperation = ubo
+
+	var ueo extras.BaseOperationExtensions
+	if err := ueo.DecodeJSON(b, enc); err != nil {
+		return common.DecorateError(err, common.ErrDecodeJson, *op)
+	}
+
+	op.BaseOperationExtensions = &ueo
 
 	return nil
 }

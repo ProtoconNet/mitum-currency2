@@ -2,6 +2,7 @@ package extension
 
 import (
 	"context"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"sync"
 
 	"github.com/ProtoconNet/mitum-currency/v3/common"
@@ -40,7 +41,6 @@ type CreateContractAccountItemProcessor struct {
 	item   CreateContractAccountItem
 	ns     base.StateMergeValue
 	oas    base.StateMergeValue
-	oac    types.Account
 	nb     map[types.CurrencyID]base.StateMergeValue
 }
 
@@ -63,18 +63,6 @@ func (opp *CreateContractAccountItemProcessor) PreProcess(
 
 	opp.ns = state.NewStateMergeValue(ast.Key(), ast.Value())
 	opp.oas = state.NewStateMergeValue(cst.Key(), cst.Value())
-
-	aSt, aErr := state.ExistsAccount(opp.sender, "sender", true, getStateFunc)
-	if aErr != nil {
-		return e.Wrap(aErr)
-	}
-
-	oac, err := currencystate.LoadAccountStateValue(aSt)
-	if err != nil {
-		return e.Wrap(err)
-	}
-
-	opp.oac = *oac
 
 	nb := map[types.CurrencyID]base.StateMergeValue{}
 	amounts := opp.item.Amounts()
@@ -137,7 +125,7 @@ func (opp *CreateContractAccountItemProcessor) Process(
 	}
 	sts[0] = state.NewStateMergeValue(opp.ns.Key(), currencystate.NewAccountStateValue(ncac))
 
-	cas := types.NewContractAccountStatus(opp.oac.Address(), nil)
+	cas := types.NewContractAccountStatus(opp.sender, nil)
 	sts[1] = state.NewStateMergeValue(opp.oas.Key(), extension.NewContractAccountStateValue(cas))
 
 	amounts := opp.item.Amounts()
@@ -168,7 +156,6 @@ func (opp *CreateContractAccountItemProcessor) Close() {
 	opp.nb = nil
 	opp.sender = nil
 	opp.oas = nil
-	opp.oac = types.Account{}
 
 	createContractAccountItemProcessorPool.Put(opp)
 }
@@ -216,25 +203,6 @@ func (opp *CreateContractAccountProcessor) PreProcess(
 				Errorf("expected CreateContractAccountFact, not %T", op.Fact())), nil
 	}
 
-	aSt, _, aErr, cErr := state.ExistsCAccount(fact.Sender(), "sender", true, false, getStateFunc)
-	if aErr != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", aErr)), nil
-	} else if cErr != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMCAccountNA).Errorf("%v", cErr)), nil
-	}
-
-	ac, err := currencystate.LoadAccountStateValue(aSt)
-	if err != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMStateValInvalid).
-				Errorf("%v: sender account, %v", err, fact.Sender())), nil
-	}
-
 	items := fact.Items()
 	var wg sync.WaitGroup
 	errChan := make(chan *base.BaseOperationProcessReasonError, len(items))
@@ -256,7 +224,6 @@ func (opp *CreateContractAccountProcessor) PreProcess(
 			c.h = op.Hash()
 			c.item = item
 			c.sender = fact.Sender()
-			c.oac = *ac
 
 			if err := c.PreProcess(ctx, op, getStateFunc); err != nil {
 				err := base.NewBaseOperationProcessReasonError(common.ErrMPreProcess.
@@ -344,8 +311,8 @@ func (opp *CreateContractAccountProcessor) Process( // nolint:dupl
 
 	var required map[types.CurrencyID][]common.Big
 	switch i := op.Fact().(type) {
-	case currency.FeeBaser:
-		required, _ = i.FeeBase()
+	case extras.FeeAble:
+		required = i.FeeBase()
 	default:
 	}
 
@@ -387,21 +354,4 @@ func (opp *CreateContractAccountProcessor) Close() error {
 	createContractAccountProcessorPool.Put(opp)
 
 	return nil
-}
-
-func (opp *CreateContractAccountProcessor) calculateItemsFee(
-	op base.Operation,
-	getStateFunc base.GetStateFunc,
-) (map[types.CurrencyID]base.State, map[types.CurrencyID][2]common.Big, error) {
-	fact, ok := op.Fact().(CreateContractAccountFact)
-	if !ok {
-		return nil, nil, errors.Errorf("expected CreateContractAccountFact, not %T", op.Fact())
-	}
-
-	items := make([]currency.AmountsItem, len(fact.items))
-	for i := range fact.items {
-		items[i] = fact.items[i]
-	}
-
-	return currency.CalculateItemsFee(getStateFunc, items)
 }

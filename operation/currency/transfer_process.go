@@ -3,6 +3,7 @@ package currency
 import (
 	"context"
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/state"
 	"github.com/ProtoconNet/mitum-currency/v3/state/currency"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
@@ -43,11 +44,13 @@ func (opp *TransferItemProcessor) PreProcess(
 	e := util.StringError("preprocess TransferItemProcessor")
 
 	rb := map[types.CurrencyID]base.StateMergeValue{}
+
+	receiver := opp.item.Receiver()
 	amounts := opp.item.Amounts()
 	for i := range amounts {
 		am := amounts[i]
 		cid := am.Currency()
-		receiver := opp.item.Receiver()
+
 		_, err := state.ExistsCurrencyPolicy(cid, getStateFunc)
 		if err != nil {
 			return e.Wrap(err)
@@ -58,34 +61,6 @@ func (opp *TransferItemProcessor) PreProcess(
 			return e.Wrap(
 				common.ErrCAccountNA.Wrap(errors.Errorf("%v: receiver %v is contract account", cErr, receiver)))
 		}
-
-		st, _, err := getStateFunc(currency.BalanceStateKey(receiver, cid))
-		if err != nil {
-			return err
-		}
-
-		var balance types.Amount
-		if st == nil {
-			balance = types.NewZeroAmount(cid)
-		} else {
-			balance, err = currency.StateBalanceValue(st)
-			if err != nil {
-				return err
-			}
-		}
-
-		rb[am.Currency()] = common.NewBaseStateMergeValue(
-			currency.BalanceStateKey(receiver, cid),
-			currency.NewAddBalanceStateValue(balance),
-			func(height base.Height, st base.State) base.StateValueMerger {
-				return currency.NewBalanceStateValueMerger(
-					height,
-					currency.BalanceStateKey(receiver, cid),
-					cid,
-					st,
-				)
-			},
-		)
 	}
 
 	opp.rb = rb
@@ -111,16 +86,31 @@ func (opp *TransferItemProcessor) Process(
 	for i := range amounts {
 		am := amounts[i]
 		cid := am.Currency()
-		stv := opp.rb[cid]
-		v, ok := stv.Value().(currency.AddBalanceStateValue)
-		if !ok {
-			return nil, errors.Errorf("not AddBalanceStateValue, %T", stv.Value())
+
+		st, _, err := getStateFunc(currency.BalanceStateKey(receiver, cid))
+		if err != nil {
+			return nil, err
 		}
+
+		var balance types.Amount
+		if st == nil {
+			balance = types.NewZeroAmount(cid)
+		} else {
+			balance, err = currency.StateBalanceValue(st)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		sts = append(sts, common.NewBaseStateMergeValue(
-			stv.Key(),
-			currency.NewAddBalanceStateValue(v.Amount.WithBig(am.Big())),
+			currency.BalanceStateKey(receiver, cid),
+			currency.NewAddBalanceStateValue(balance.WithBig(am.Big())),
 			func(height base.Height, st base.State) base.StateValueMerger {
-				return currency.NewBalanceStateValueMerger(height, stv.Key(), cid, st)
+				return currency.NewBalanceStateValueMerger(height,
+					currency.BalanceStateKey(receiver, cid),
+					cid,
+					st,
+				)
 			},
 		))
 	}
@@ -179,14 +169,6 @@ func (opp *TransferProcessor) PreProcess(
 		return ctx, base.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.Wrap(common.ErrMTypeMismatch).Errorf("expected %T, not %T", TransferFact{}, op.Fact()),
 		), nil
-	}
-
-	if _, _, aErr, cErr := state.ExistsCAccount(fact.Sender(), "sender", true, false, getStateFunc); aErr != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.Errorf("%v", aErr)), nil
-	} else if cErr != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.Wrap(common.ErrMCAccountNA).Errorf("%v", cErr)), nil
 	}
 
 	var wg sync.WaitGroup
@@ -289,8 +271,8 @@ func (opp *TransferProcessor) Process( // nolint:dupl
 
 	var required map[types.CurrencyID][]common.Big
 	switch i := op.Fact().(type) {
-	case FeeBaser:
-		required, _ = i.FeeBase()
+	case extras.FeeAble:
+		required = i.FeeBase()
 	default:
 	}
 
@@ -332,17 +314,4 @@ func (opp *TransferProcessor) Close() error {
 	transferProcessorPool.Put(opp)
 
 	return nil
-}
-
-func (opp *TransferProcessor) calculateItemsFee(op base.Operation, getStateFunc base.GetStateFunc) (map[types.CurrencyID]base.State, map[types.CurrencyID][2]common.Big, error) {
-	fact, ok := op.Fact().(TransferFact)
-	if !ok {
-		return nil, nil, errors.Errorf("expected %T, not %T", TransferFact{}, op.Fact())
-	}
-	items := make([]AmountsItem, len(fact.items))
-	for i := range fact.items {
-		items[i] = fact.items[i]
-	}
-
-	return CalculateItemsFee(getStateFunc, items)
 }

@@ -67,12 +67,12 @@ func (fact *MintFact) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 }
 
 func (op *Mint) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
-	var ubo common.MBaseOperation
+	var ubo common.BaseOperation
 	if err := ubo.DecodeBSON(b, enc); err != nil {
 		return common.DecorateError(err, common.ErrDecodeBson, *op)
 	}
 
-	op.MBaseOperation = ubo
+	op.BaseOperation = ubo
 
 	return nil
 }

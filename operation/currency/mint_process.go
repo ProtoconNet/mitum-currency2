@@ -118,14 +118,6 @@ func (opp *MintProcessor) PreProcess(
 			return ctx, base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.Wrap(common.ErrMCAccountNA).Errorf("%v: receiver %v is contract account", cErr, item.Receiver())), nil
 		}
-
-		//if _, _, aErr, cErr := state.ExistsCAccount(item.Receiver(), "receiver", true, false, getStateFunc); aErr != nil {
-		//	return ctx, base.NewBaseOperationProcessReasonError(
-		//		common.ErrMPreProcess.Errorf("%v", aErr)), nil
-		//} else if cErr != nil {
-		//	return ctx, base.NewBaseOperationProcessReasonError(
-		//		common.ErrMPreProcess.Wrap(common.ErrMCAccountNA).Errorf("%v", cErr)), nil
-		//}
 	}
 
 	return ctx, nil, nil
