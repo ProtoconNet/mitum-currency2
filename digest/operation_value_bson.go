@@ -2,6 +2,7 @@ package digest
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/ProtoconNet/mitum2/util/hint"
@@ -23,22 +24,17 @@ func (va OperationValue) MarshalBSON() ([]byte, error) {
 	}
 
 	var op = make(map[string]interface{})
-	switch k := va.op.(type) {
-	case common.IExtendedOperation:
-		op = map[string]interface{}{
-			"_hint":          va.op.Hint().String(),
-			"hash":           va.op.Hash().String(),
-			"fact":           va.op.Fact(),
-			"signs":          signs,
-			"authentication": k.GetAuthentication(),
-			"settlement":     k.GetSettlement(),
-		}
-	default:
-		op = map[string]interface{}{
-			"_hint": va.op.Hint().String(),
-			"hash":  va.op.Hash().String(),
-			"fact":  va.op.Fact(),
-			"signs": signs,
+	op = map[string]interface{}{
+		"_hint": va.op.Hint().String(),
+		"hash":  va.op.Hash().String(),
+		"fact":  va.op.Fact(),
+		"signs": signs,
+	}
+
+	eo, ok := va.op.(extras.OperationExtensions)
+	if ok {
+		for k, v := range eo.Extensions() {
+			op[k] = v
 		}
 	}
 
@@ -84,12 +80,40 @@ func (va *OperationValue) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
 		return e.Wrap(err)
 	}
 
-	va.op = op
+	var ueo extras.BaseOperationExtensions
+	if err := ueo.DecodeBSON(b, enc); err != nil {
+		return e.Wrap(err)
+	}
+
+	if ueo.Extensions() != nil {
+		va.op = ExtendedOperation{
+			BaseOperation:           op,
+			BaseOperationExtensions: ueo,
+		}
+	} else {
+		va.op = op
+	}
 
 	va.height = uva.Height
 	va.confirmedAt = uva.ConfirmedAt
 	va.inState = uva.InState
 	va.index = uva.Index
 	va.reason = uva.RS
+	return nil
+}
+
+type ExtendedOperation struct {
+	common.BaseOperation
+	extras.BaseOperationExtensions
+}
+
+func (op ExtendedOperation) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
 	return nil
 }
