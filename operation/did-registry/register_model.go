@@ -2,6 +2,7 @@ package did_registry
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	mitumbase "github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -110,17 +111,44 @@ func (fact RegisterModelFact) Currency() types.CurrencyID {
 	return fact.currency
 }
 
-func (fact RegisterModelFact) FeeBase() (map[types.CurrencyID][]common.Big, mitumbase.Address) {
+func (fact RegisterModelFact) FeeBase() map[types.CurrencyID][]common.Big {
 	required := make(map[types.CurrencyID][]common.Big)
 	required[fact.Currency()] = []common.Big{common.ZeroBig}
 
-	return required, fact.sender
+	return required
+}
+
+func (fact RegisterModelFact) FeePayer() mitumbase.Address {
+	return fact.sender
+}
+
+func (fact RegisterModelFact) FactUser() mitumbase.Address {
+	return fact.sender
+}
+
+func (fact RegisterModelFact) InActiveContractOwnerHandlerOnly() (mitumbase.Address, mitumbase.Address) {
+	return fact.contract, fact.sender
 }
 
 type RegisterModel struct {
 	common.BaseOperation
+	*extras.BaseOperationExtensions
 }
 
 func NewRegisterModel(fact RegisterModelFact) (RegisterModel, error) {
-	return RegisterModel{BaseOperation: common.NewBaseOperation(RegisterModelHint, fact)}, nil
+	return RegisterModel{
+		BaseOperation:           common.NewBaseOperation(RegisterModelHint, fact),
+		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+	}, nil
+}
+
+func (op RegisterModel) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
+	return nil
 }

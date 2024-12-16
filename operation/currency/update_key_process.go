@@ -91,11 +91,6 @@ func (opp *UpdateKeyProcessor) PreProcess(
 			common.ErrMPreProcess.Wrap(common.ErrMValueInvalid).Errorf("sender keys is same with keys to update, keys hash %v", fact.keys.Hash())), nil
 	}
 
-	//if err := state.CheckFactSignsByState(fact.Sender(), op.Signs(), getStateFunc); err != nil {
-	//	return ctx, base.NewBaseOperationProcessReasonError(
-	//		common.ErrMPreProcess.Wrap(common.ErrMSignInvalid).Errorf("%v", err)), nil
-	//}
-
 	return ctx, nil, nil
 }
 
@@ -110,63 +105,12 @@ func (opp *UpdateKeyProcessor) Process( // nolint:dupl
 		return nil, nil, e.Errorf("expected %T, not %T", UpdateKeyFact{}, op.Fact())
 	}
 
+	var stmvs []base.StateMergeValue // nolint:prealloc
+
 	var tgAccSt base.State
 	var err error
 	if tgAccSt, err = state.ExistsState(currency.AccountStateKey(fact.Sender()), "sender keys", getStateFunc); err != nil {
 		return nil, base.NewBaseOperationProcessReasonError("sender account not found, %v; %w", fact.Sender(), err), nil
-	}
-
-	var fee common.Big
-	policy, err := state.ExistsCurrencyPolicy(fact.Currency(), getStateFunc)
-	if err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("check existence of currency id %q; %w", fact.Currency(), err), nil
-	} else if fee, err = policy.Feeer().Fee(common.ZeroBig); err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("check fee of currency id %q; %w", fact.Currency(), err), nil
-	}
-
-	var tgBalSt base.State
-	if tgBalSt, err = state.ExistsState(currency.BalanceStateKey(fact.Sender(), fact.Currency()), "balance of sender", getStateFunc); err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("sender account balance not found, %v; %w", fact.Sender(), err), nil
-	} else if b, err := currency.StateBalanceValue(tgBalSt); err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("failed to get sender balance value, %v, %v; %w", fact.Currency(), fact.Sender(), err), nil
-	} else if b.Big().Compare(fee) < 0 {
-		return nil, base.NewBaseOperationProcessReasonError("insufficient balance with fee %v ,%v", fact.Currency(), fact.Sender()), nil
-	}
-
-	var stmvs []base.StateMergeValue // nolint:prealloc
-	v, ok := tgBalSt.Value().(currency.BalanceStateValue)
-	if !ok {
-		return nil, base.NewBaseOperationProcessReasonError("expected %T, not %T", currency.BalanceStateValue{}, tgBalSt.Value()), nil
-	}
-
-	if policy.Feeer().Receiver() != nil {
-		if err := state.CheckExistsState(currency.AccountStateKey(policy.Feeer().Receiver()), getStateFunc); err != nil {
-			return nil, nil, errors.Errorf("feeer receiver %s not found", policy.Feeer().Receiver())
-		} else if feeRcvrSt, found, err := getStateFunc(currency.BalanceStateKey(policy.Feeer().Receiver(), fact.Currency())); err != nil {
-			return nil, nil, errors.Errorf("feeer receiver %s balance of %s not found", policy.Feeer().Receiver(), fact.Currency())
-		} else if !found {
-			return nil, nil, errors.Errorf("feeer receiver %s balance of %s not found", policy.Feeer().Receiver(), fact.Currency())
-		} else if feeRcvrSt.Key() != tgBalSt.Key() {
-			r, ok := feeRcvrSt.Value().(currency.BalanceStateValue)
-			if !ok {
-				return nil, nil, errors.Errorf("expected %T, not %T", currency.BalanceStateValue{}, feeRcvrSt.Value())
-			}
-			stmvs = append(stmvs, common.NewBaseStateMergeValue(
-				feeRcvrSt.Key(),
-				currency.NewAddBalanceStateValue(r.Amount.WithBig(fee)),
-				func(height base.Height, st base.State) base.StateValueMerger {
-					return currency.NewBalanceStateValueMerger(height, feeRcvrSt.Key(), fact.Currency(), st)
-				},
-			))
-
-			stmvs = append(stmvs, common.NewBaseStateMergeValue(
-				tgBalSt.Key(),
-				currency.NewDeductBalanceStateValue(v.Amount.WithBig(fee)),
-				func(height base.Height, st base.State) base.StateValueMerger {
-					return currency.NewBalanceStateValueMerger(height, tgBalSt.Key(), fact.Currency(), st)
-				},
-			))
-		}
 	}
 
 	ac, err := currency.LoadAccountStateValue(tgAccSt)

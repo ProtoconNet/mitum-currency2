@@ -2,6 +2,7 @@ package did_registry
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	currencytypes "github.com/ProtoconNet/mitum-currency/v3/types"
 	mitumbase "github.com/ProtoconNet/mitum2/base"
@@ -53,6 +54,7 @@ func (fact UpdateDIDDocumentFact) IsValid(b []byte) error {
 		fact.sender,
 		fact.contract,
 		fact.currency,
+		fact.document,
 	); err != nil {
 		return common.ErrFactInvalid.Wrap(err)
 	}
@@ -126,17 +128,44 @@ func (fact UpdateDIDDocumentFact) Addresses() ([]mitumbase.Address, error) {
 	return as, nil
 }
 
-func (fact UpdateDIDDocumentFact) FeeBase() (map[types.CurrencyID][]common.Big, mitumbase.Address) {
+func (fact UpdateDIDDocumentFact) FeeBase() map[types.CurrencyID][]common.Big {
 	required := make(map[types.CurrencyID][]common.Big)
 	required[fact.Currency()] = []common.Big{common.ZeroBig}
 
-	return required, fact.sender
+	return required
+}
+
+func (fact UpdateDIDDocumentFact) FeePayer() mitumbase.Address {
+	return fact.sender
+}
+
+func (fact UpdateDIDDocumentFact) FactUser() mitumbase.Address {
+	return fact.sender
+}
+
+func (fact UpdateDIDDocumentFact) ActiveContract() mitumbase.Address {
+	return fact.contract
 }
 
 type UpdateDIDDocument struct {
 	common.BaseOperation
+	*extras.BaseOperationExtensions
 }
 
 func NewUpdateDIDDocument(fact UpdateDIDDocumentFact) (UpdateDIDDocument, error) {
-	return UpdateDIDDocument{BaseOperation: common.NewBaseOperation(UpdateDIDDocumentHint, fact)}, nil
+	return UpdateDIDDocument{
+		BaseOperation:           common.NewBaseOperation(UpdateDIDDocumentHint, fact),
+		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+	}, nil
+}
+
+func (op UpdateDIDDocument) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
+	return nil
 }

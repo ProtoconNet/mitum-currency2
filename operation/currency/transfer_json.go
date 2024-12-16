@@ -3,6 +3,7 @@ package currency
 import (
 	"encoding/json"
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/ProtoconNet/mitum2/util/encoder"
@@ -45,8 +46,9 @@ func (fact *TransferFact) DecodeJSON(b []byte, enc encoder.Encoder) error {
 }
 
 func (op Transfer) MarshalJSON() ([]byte, error) {
-	return util.MarshalJSON(BaseOperationMarshaler{
-		BaseOperationJSONMarshaler: op.BaseOperation.JSONMarshaler(),
+	return util.MarshalJSON(OperationMarshaler{
+		BaseOperationJSONMarshaler:           op.BaseOperation.JSONMarshaler(),
+		BaseOperationExtensionsJSONMarshaler: op.BaseOperationExtensions.JSONMarshaler(),
 	})
 }
 
@@ -57,6 +59,13 @@ func (op *Transfer) DecodeJSON(b []byte, enc encoder.Encoder) error {
 	}
 
 	op.BaseOperation = ubo
+
+	var ueo extras.BaseOperationExtensions
+	if err := ueo.DecodeJSON(b, enc); err != nil {
+		return common.DecorateError(err, common.ErrDecodeJson, *op)
+	}
+
+	op.BaseOperationExtensions = &ueo
 
 	return nil
 }

@@ -2,9 +2,8 @@ package extension
 
 import (
 	"encoding/json"
-
 	"github.com/ProtoconNet/mitum-currency/v3/common"
-	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/ProtoconNet/mitum2/util/encoder"
@@ -45,19 +44,32 @@ func (fact *CreateContractAccountFact) DecodeJSON(b []byte, enc encoder.Encoder)
 	return nil
 }
 
+type OperationMarshaler struct {
+	common.BaseOperationJSONMarshaler
+	extras.BaseOperationExtensionsJSONMarshaler
+}
+
 func (op CreateContractAccount) MarshalJSON() ([]byte, error) {
-	return util.MarshalJSON(currency.BaseOperationMarshaler{
-		BaseOperationJSONMarshaler: op.BaseOperation.JSONMarshaler(),
+	return util.MarshalJSON(OperationMarshaler{
+		BaseOperationJSONMarshaler:           op.BaseOperation.JSONMarshaler(),
+		BaseOperationExtensionsJSONMarshaler: op.BaseOperationExtensions.JSONMarshaler(),
 	})
 }
 
 func (op *CreateContractAccount) DecodeJSON(b []byte, enc encoder.Encoder) error {
 	var ubo common.BaseOperation
 	if err := ubo.DecodeJSON(b, enc); err != nil {
-		return common.DecorateError(err, common.ErrDecodeBson, *op)
+		return common.DecorateError(err, common.ErrDecodeJson, *op)
 	}
 
 	op.BaseOperation = ubo
+
+	var ueo extras.BaseOperationExtensions
+	if err := ueo.DecodeJSON(b, enc); err != nil {
+		return common.DecorateError(err, common.ErrDecodeJson, *op)
+	}
+
+	op.BaseOperationExtensions = &ueo
 
 	return nil
 }

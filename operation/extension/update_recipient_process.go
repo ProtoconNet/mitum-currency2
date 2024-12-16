@@ -79,37 +79,6 @@ func (opp *UpdateRecipientProcessor) PreProcess(
 		), nil
 	}
 
-	if _, _, aErr, cErr := state.ExistsCAccount(fact.Sender(), "sender", true, false, getStateFunc); aErr != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", aErr)), nil
-	} else if cErr != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMCAccountNA).
-				Errorf("%v: sender %v is contract account", cErr, fact.Sender())), nil
-	}
-
-	if _, cSt, aErr, cErr := state.ExistsCAccount(fact.Contract(), "contract", true, true, getStateFunc); aErr != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", aErr)), nil
-	} else if cErr != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", cErr)), nil
-	} else if status, err := extension.StateContractAccountValue(cSt); err != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMStateValInvalid).
-				Errorf("%v", cErr)), nil
-	} else if !status.Owner().Equal(fact.Sender()) {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMAccountNAth).
-				Errorf("sender %v is not owner of contract account", fact.Sender())), nil
-	}
-
 	for i := range fact.Recipients() {
 		if _, _, _, cErr := state.ExistsCAccount(
 			fact.Recipients()[i], "recipient", true, false, getStateFunc); cErr != nil {

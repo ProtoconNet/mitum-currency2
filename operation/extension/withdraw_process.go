@@ -2,6 +2,7 @@ package extension
 
 import (
 	"context"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"sync"
 
 	"github.com/ProtoconNet/mitum-currency/v3/common"
@@ -182,20 +183,6 @@ func (opp *WithdrawProcessor) PreProcess(
 				Errorf("expected WithdrawFact, not %T", op.Fact())), nil
 	}
 
-	if err := state.CheckExistsState(statecurrency.AccountStateKey(fact.Sender()), getStateFunc); err != nil {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMAccountNF).
-				Errorf("sender %v", fact.Sender())), nil
-	}
-
-	if found, _ := state.CheckNotExistsState(extension.StateKeyContractAccount(fact.Sender()), getStateFunc); found {
-		return ctx, base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMCAccountNA).
-				Errorf("sender %v is contract account", fact.Sender())), nil
-	}
-
 	for i := range fact.items {
 		cip := withdrawItemProcessorPool.Get()
 		c, ok := cip.(*WithdrawItemProcessor)
@@ -261,8 +248,8 @@ func (opp *WithdrawProcessor) Process( // nolint:dupl
 
 	var required map[types.CurrencyID][]common.Big
 	switch i := op.Fact().(type) {
-	case currency.FeeBaser:
-		required, _ = i.FeeBase()
+	case extras.FeeAble:
+		required = i.FeeBase()
 	default:
 	}
 
@@ -307,17 +294,4 @@ func (opp *WithdrawProcessor) Close() error {
 	withdrawProcessorPool.Put(opp)
 
 	return nil
-}
-
-func (opp *WithdrawProcessor) calculateItemsFee(op base.Operation, getStateFunc base.GetStateFunc) (map[types.CurrencyID]base.State, map[types.CurrencyID][2]common.Big, error) {
-	fact, ok := op.Fact().(WithdrawFact)
-	if !ok {
-		return nil, nil, errors.Errorf("expected WithdrawFact, not %T", op.Fact())
-	}
-	items := make([]currency.AmountsItem, len(fact.items))
-	for i := range fact.items {
-		items[i] = fact.items[i]
-	}
-
-	return currency.CalculateItemsFee(getStateFunc, items)
 }

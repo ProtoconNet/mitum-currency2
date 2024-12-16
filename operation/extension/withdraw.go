@@ -3,6 +3,7 @@ package extension
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -146,7 +147,7 @@ func (fact WithdrawFact) Addresses() ([]base.Address, error) {
 	return as, nil
 }
 
-func (fact WithdrawFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+func (fact WithdrawFact) FeeBase() map[types.CurrencyID][]common.Big {
 	required := make(map[types.CurrencyID][]common.Big)
 	items := make([]currency.AmountsItem, len(fact.items))
 	for i := range fact.items {
@@ -171,20 +172,43 @@ func (fact WithdrawFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Addr
 		}
 	}
 
-	return required, fact.Sender()
+	return required
+}
+
+func (fact WithdrawFact) FeePayer() base.Address {
+	return fact.sender
+}
+
+func (fact WithdrawFact) FactUser() base.Address {
+	return fact.sender
 }
 
 type Withdraw struct {
 	common.BaseOperation
+	*extras.BaseOperationExtensions
 }
 
 func NewWithdraw(fact WithdrawFact) (Withdraw, error) {
-	return Withdraw{BaseOperation: common.NewBaseOperation(WithdrawHint, fact)}, nil
+	return Withdraw{
+		BaseOperation:           common.NewBaseOperation(WithdrawHint, fact),
+		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+	}, nil
 }
 
 func (op *Withdraw) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
 	err := op.Sign(priv, networkID)
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (op Withdraw) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
 		return err
 	}
 

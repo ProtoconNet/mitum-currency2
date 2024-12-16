@@ -2,6 +2,7 @@ package currency
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -103,15 +104,24 @@ func (fact UpdateKeyFact) Rebuild() UpdateKeyFact {
 	return fact
 }
 
-func (fact UpdateKeyFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+func (fact UpdateKeyFact) FeeBase() map[types.CurrencyID][]common.Big {
 	required := make(map[types.CurrencyID][]common.Big)
 	required[fact.Currency()] = []common.Big{common.ZeroBig}
 
-	return required, fact.Sender()
+	return required
+}
+
+func (fact UpdateKeyFact) FeePayer() base.Address {
+	return fact.sender
+}
+
+func (fact UpdateKeyFact) FactUser() base.Address {
+	return fact.sender
 }
 
 type UpdateKey struct {
 	common.BaseOperation
+	*extras.BaseOperationExtensions
 }
 
 func NewUpdateKey(fact UpdateKeyFact) (UpdateKey, error) {
@@ -123,5 +133,16 @@ func (op *UpdateKey) HashSign(priv base.Privatekey, networkID base.NetworkID) er
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (op UpdateKey) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
 	return nil
 }

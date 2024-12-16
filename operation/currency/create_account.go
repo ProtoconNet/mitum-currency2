@@ -2,6 +2,7 @@ package currency
 
 import (
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -16,10 +17,6 @@ var (
 )
 
 var MaxCreateAccountItems uint = 100
-
-type FeeBaser interface {
-	FeeBase() (map[types.CurrencyID][]common.Big, base.Address)
-}
 
 type Signer interface {
 	Signer() base.Address
@@ -182,7 +179,7 @@ func (fact CreateAccountFact) Rebuild() CreateAccountFact {
 	return fact
 }
 
-func (fact CreateAccountFact) FeeBase() (map[types.CurrencyID][]common.Big, base.Address) {
+func (fact CreateAccountFact) FeeBase() map[types.CurrencyID][]common.Big {
 	required := make(map[types.CurrencyID][]common.Big)
 	items := make([]AmountsItem, len(fact.items))
 	for i := range fact.items {
@@ -207,15 +204,38 @@ func (fact CreateAccountFact) FeeBase() (map[types.CurrencyID][]common.Big, base
 		}
 	}
 
-	return required, fact.Sender()
+	return required
+}
+
+func (fact CreateAccountFact) FeePayer() base.Address {
+	return fact.sender
+}
+
+func (fact CreateAccountFact) FactUser() base.Address {
+	return fact.sender
 }
 
 type CreateAccount struct {
 	common.BaseOperation
+	*extras.BaseOperationExtensions
 }
 
 func NewCreateAccount(fact CreateAccountFact) (CreateAccount, error) {
-	return CreateAccount{BaseOperation: common.NewBaseOperation(CreateAccountHint, fact)}, nil
+	return CreateAccount{
+		BaseOperation:           common.NewBaseOperation(CreateAccountHint, fact),
+		BaseOperationExtensions: extras.NewBaseOperationExtensions(),
+	}, nil
+}
+
+func (op CreateAccount) IsValid(networkID []byte) error {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
+		return err
+	}
+	if err := op.BaseOperationExtensions.IsValid(networkID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (op *CreateAccount) HashSign(priv base.Privatekey, networkID base.NetworkID) error {
@@ -225,18 +245,3 @@ func (op *CreateAccount) HashSign(priv base.Privatekey, networkID base.NetworkID
 	}
 	return nil
 }
-
-//func (op *CreateAccount) Error(v error, err error) error {
-//	var nerr error
-//
-//	switch {
-//	case errors.Is(v, common.ErrDecodeBson):
-//		nerr = common.ErrDecodeBson.WithMessage(err, "%T", *op)
-//	case errors.Is(v, common.ErrDecodeJson):
-//		nerr = common.ErrDecodeJson.WithMessage(err, "%T", *op)
-//	default:
-//		nerr = err
-//	}
-//
-//	return nerr
-//}
