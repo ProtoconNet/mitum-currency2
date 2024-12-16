@@ -2,8 +2,6 @@ package common
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"golang.org/x/exp/slices"
 
 	"github.com/ProtoconNet/mitum2/base"
@@ -13,143 +11,41 @@ import (
 	"github.com/pkg/errors"
 )
 
-type IExtendedOperation interface {
-	Contract() (base.Address, bool)
-	AuthenticationID() string
-	ProofData() string
-	OpSender() (base.Address, bool)
-	ProxyPayer() (base.Address, bool)
-	GetAuthentication() Authentication
-	GetSettlement() Settlement
-}
-
-type Authentication interface {
-	util.IsValider
-	Contract() (base.Address, bool)
-	AuthenticationID() string
-	ProofData() string
-	Bytes() []byte
-}
-
-type Settlement interface {
-	util.IsValider
-	OpSender() (base.Address, bool)
-	ProxyPayer() (base.Address, bool)
-	Bytes() []byte
-}
-
 type BaseOperation struct {
-	MBaseOperation
-	Authentication
-	Settlement
-}
-
-func NewBaseOperation(ht hint.Hint, fact base.Fact) BaseOperation {
-	return BaseOperation{
-		MBaseOperation: NewMBaseOperation(ht, fact),
-	}
-}
-
-func (op BaseOperation) GetAuthentication() Authentication {
-	return op.Authentication
-}
-
-func (op *BaseOperation) SetAuthentication(authentication Authentication) {
-	op.Authentication = authentication
-}
-
-func (op BaseOperation) GetSettlement() Settlement {
-	return op.Settlement
-}
-
-func (op *BaseOperation) SetSettlement(settlement Settlement) {
-	op.Settlement = settlement
-}
-
-func (op *BaseOperation) Sign(priv base.Privatekey, networkID base.NetworkID) error {
-	err := op.MBaseOperation.Sign(priv, networkID)
-	if err != nil {
-		return err
-	}
-
-	op.h = op.hash()
-
-	return nil
-}
-
-func (op BaseOperation) hash() util.Hash {
-	return valuehash.NewSHA256(op.HashBytes())
-}
-
-func (op BaseOperation) HashBytes() []byte {
-	var bs [][]byte
-	bs = append(bs, op.MBaseOperation.HashBytes())
-	if op.Authentication != nil {
-		bs = append(bs, op.Authentication.Bytes())
-	}
-	if op.Settlement != nil {
-		bs = append(bs, op.Settlement.Bytes())
-	}
-
-	return util.ConcatBytesSlice(bs...)
-}
-
-func (op BaseOperation) String() string {
-	var b []byte
-	b, _ = json.Marshal(op)
-
-	return fmt.Sprintf("%s", string(b))
-}
-
-func (op BaseOperation) IsValid(networkID []byte) error {
-	if err := util.CheckIsValiders(networkID, false, op.MBaseOperation); err != nil {
-		return ErrOperationInvalid.Wrap(err)
-	}
-	if err := util.CheckIsValiders(networkID, true, op.Authentication, op.Settlement); err != nil {
-		return ErrOperationInvalid.Wrap(err)
-	}
-
-	if !op.h.Equal(op.hash()) {
-		return ErrOperationInvalid.Wrap(ErrValueInvalid.Wrap(errors.Errorf("hash does not match")))
-	}
-	return nil
-}
-
-type MBaseOperation struct {
 	h     util.Hash
 	fact  base.Fact
 	signs []base.Sign
 	hint.BaseHinter
 }
 
-func NewMBaseOperation(ht hint.Hint, fact base.Fact) MBaseOperation {
-	return MBaseOperation{
+func NewBaseOperation(ht hint.Hint, fact base.Fact) BaseOperation {
+	return BaseOperation{
 		BaseHinter: hint.NewBaseHinter(ht),
 		fact:       fact,
 	}
 }
 
-func (op MBaseOperation) Hash() util.Hash {
+func (op BaseOperation) Hash() util.Hash {
 	return op.h
 }
 
-func (op *MBaseOperation) SetHash(h util.Hash) {
+func (op *BaseOperation) SetHash(h util.Hash) {
 	op.h = h
 }
 
-func (op MBaseOperation) Signs() []base.Sign {
+func (op BaseOperation) Signs() []base.Sign {
 	return op.signs
 }
 
-func (op MBaseOperation) Fact() base.Fact {
+func (op BaseOperation) Fact() base.Fact {
 	return op.fact
 }
 
-func (op *MBaseOperation) SetFact(fact base.Fact) {
+func (op *BaseOperation) SetFact(fact base.Fact) {
 	op.fact = fact
 }
 
-func (op MBaseOperation) HashBytes() []byte {
+func (op BaseOperation) HashBytes() []byte {
 	bs := make([]util.Byter, len(op.signs)+1)
 	bs[0] = op.fact.Hash()
 
@@ -160,7 +56,7 @@ func (op MBaseOperation) HashBytes() []byte {
 	return util.ConcatByters(bs...)
 }
 
-func (op MBaseOperation) IsValid(networkID []byte) error {
+func (op BaseOperation) IsValid(networkID []byte) error {
 	if len(op.signs) < 1 {
 		return ErrOperationInvalid.Wrap(ErrSignInvalid.Wrap(errors.Errorf("empty signs")))
 	}
@@ -197,7 +93,7 @@ func (op MBaseOperation) IsValid(networkID []byte) error {
 	return nil
 }
 
-func (op *MBaseOperation) Sign(priv base.Privatekey, networkID base.NetworkID) error {
+func (op *BaseOperation) Sign(priv base.Privatekey, networkID base.NetworkID) error {
 	switch index, sign, err := op.sign(priv, networkID); {
 	case err != nil:
 		return err
@@ -212,7 +108,7 @@ func (op *MBaseOperation) Sign(priv base.Privatekey, networkID base.NetworkID) e
 	return nil
 }
 
-func (op *MBaseOperation) sign(priv base.Privatekey, networkID base.NetworkID) (found int, sign base.BaseSign, _ error) {
+func (op *BaseOperation) sign(priv base.Privatekey, networkID base.NetworkID) (found int, sign base.BaseSign, _ error) {
 	e := util.StringError("sign BaseOperation")
 
 	found = -1
@@ -238,17 +134,17 @@ func (op *MBaseOperation) sign(priv base.Privatekey, networkID base.NetworkID) (
 	return found, newsign, nil
 }
 
-func (MBaseOperation) PreProcess(ctx context.Context, _ base.GetStateFunc) (
+func (BaseOperation) PreProcess(ctx context.Context, _ base.GetStateFunc) (
 	context.Context, base.OperationProcessReasonError, error,
 ) {
 	return ctx, nil, errors.WithStack(util.ErrNotImplemented)
 }
 
-func (MBaseOperation) Process(context.Context, base.GetStateFunc) ([]base.StateMergeValue, base.OperationProcessReasonError, error) {
+func (BaseOperation) Process(context.Context, base.GetStateFunc) ([]base.StateMergeValue, base.OperationProcessReasonError, error) {
 	return nil, nil, errors.WithStack(util.ErrNotImplemented)
 }
 
-func (op MBaseOperation) hash() util.Hash {
+func (op BaseOperation) hash() util.Hash {
 	return valuehash.NewSHA256(op.HashBytes())
 }
 
@@ -279,17 +175,17 @@ func IsValidOperationFact(fact base.Fact, networkID []byte) error {
 }
 
 type BaseNodeOperation struct {
-	MBaseOperation
+	BaseOperation
 }
 
 func NewBaseNodeOperation(ht hint.Hint, fact base.Fact) BaseNodeOperation {
 	return BaseNodeOperation{
-		MBaseOperation: NewMBaseOperation(ht, fact),
+		BaseOperation: NewBaseOperation(ht, fact),
 	}
 }
 
 func (op BaseNodeOperation) IsValid(networkID []byte) error {
-	if err := op.MBaseOperation.IsValid(networkID); err != nil {
+	if err := op.BaseOperation.IsValid(networkID); err != nil {
 		return ErrNodeOperationInvalid.Wrap(err)
 	}
 
