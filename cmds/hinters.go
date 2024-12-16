@@ -7,6 +7,7 @@ import (
 	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/did-registry"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	isaacoperation "github.com/ProtoconNet/mitum-currency/v3/operation/isaac"
 	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
 	statedid "github.com/ProtoconNet/mitum-currency/v3/state/did-registry"
@@ -49,8 +50,6 @@ var AddedHinters = []encoder.DecodeDetail{
 	{Hint: currency.CreateAccountItemSingleAmountHint, Instance: currency.CreateAccountItemSingleAmount{}},
 	{Hint: currency.UpdateCurrencyHint, Instance: currency.UpdateCurrency{}},
 	{Hint: currency.RegisterCurrencyHint, Instance: currency.RegisterCurrency{}},
-	//{Hint: currency.FeeOperationFactHint, Instance: currency.FeeOperationFact{}},
-	//{Hint: currency.FeeOperationHint, Instance: currency.FeeOperation{}},
 	{Hint: currency.RegisterGenesisCurrencyHint, Instance: currency.RegisterGenesisCurrency{}},
 	{Hint: currency.RegisterGenesisCurrencyFactHint, Instance: currency.RegisterGenesisCurrencyFact{}},
 	{Hint: currency.UpdateKeyHint, Instance: currency.UpdateKey{}},
@@ -67,6 +66,10 @@ var AddedHinters = []encoder.DecodeDetail{
 	{Hint: extension.WithdrawHint, Instance: extension.Withdraw{}},
 	{Hint: extension.WithdrawItemMultiAmountsHint, Instance: extension.WithdrawItemMultiAmounts{}},
 	{Hint: extension.WithdrawItemSingleAmountHint, Instance: extension.WithdrawItemSingleAmount{}},
+
+	{Hint: extras.BaseAuthenticationHint, Instance: extras.BaseAuthentication{}},
+	{Hint: extras.BaseSettlementHint, Instance: extras.BaseSettlement{}},
+	{Hint: extras.BaseProxyPayerHint, Instance: extras.BaseProxyPayer{}},
 
 	{Hint: isaacoperation.GenesisNetworkPolicyHint, Instance: isaacoperation.GenesisNetworkPolicy{}},
 	{Hint: isaacoperation.FixedSuffrageCandidateLimiterRuleHint, Instance: isaacoperation.FixedSuffrageCandidateLimiterRule{}},
