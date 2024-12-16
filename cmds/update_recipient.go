@@ -2,8 +2,8 @@ package cmds
 
 import (
 	"context"
-	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/pkg/errors"
 
 	"github.com/ProtoconNet/mitum2/base"
@@ -17,11 +17,8 @@ type UpdateRecipientCommand struct {
 	Currency   CurrencyIDFlag `arg:"" name:"currency-id" help:"currency id" required:"true"`
 	Recipients []AddressFlag  `arg:"" name:"recipients" help:"recipients"`
 	OperationExtensionFlags
-	sender      base.Address
-	target      base.Address
-	didContract base.Address
-	proxyPayer  base.Address
-	opSender    base.Address
+	sender base.Address
+	target base.Address
 }
 
 func (cmd *UpdateRecipientCommand) Run(pctx context.Context) error {
@@ -64,29 +61,7 @@ func (cmd *UpdateRecipientCommand) parseFlags() error {
 		cmd.target = target
 	}
 
-	if len(cmd.DIDContract.String()) > 0 {
-		a, err := cmd.DIDContract.Encode(cmd.Encoders.JSON())
-		if err != nil {
-			return errors.Wrapf(err, "invalid did contract format, %v", cmd.DIDContract.String())
-		}
-		cmd.didContract = a
-	}
-
-	if len(cmd.OpSender.String()) > 0 {
-		a, err := cmd.OpSender.Encode(cmd.Encoders.JSON())
-		if err != nil {
-			return errors.Wrapf(err, "invalid proxy payer format, %v", cmd.ProxyPayer.String())
-		}
-		cmd.opSender = a
-	}
-
-	if len(cmd.ProxyPayer.String()) > 0 {
-		a, err := cmd.ProxyPayer.Encode(cmd.Encoders.JSON())
-		if err != nil {
-			return errors.Wrapf(err, "invalid proxy payer format, %v", cmd.ProxyPayer.String())
-		}
-		cmd.proxyPayer = a
-	}
+	cmd.OperationExtensionFlags.parseFlags(cmd.Encoders.JSON())
 
 	return nil
 }
@@ -109,8 +84,9 @@ func (cmd *UpdateRecipientCommand) createOperation() (base.Operation, error) { /
 		return nil, errors.Wrap(err, "create updateRecipient operation")
 	}
 
-	var baseAuthentication common.Authentication
-	var baseSettlement common.Settlement
+	var baseAuthentication extras.OperationExtension
+	var baseSettlement extras.OperationExtension
+	var baseProxyPayer extras.OperationExtension
 	var proofData = cmd.Proof
 	if cmd.IsPrivateKey {
 		prk, err := base.DecodePrivatekeyFromString(cmd.Proof, enc)
@@ -126,23 +102,38 @@ func (cmd *UpdateRecipientCommand) createOperation() (base.Operation, error) { /
 	}
 
 	if cmd.didContract != nil && cmd.AuthenticationID != "" && cmd.Proof != "" {
-		baseAuthentication = common.NewBaseAuthentication(cmd.didContract, cmd.AuthenticationID, proofData)
-		op.SetAuthentication(baseAuthentication)
+		baseAuthentication = extras.NewBaseAuthentication(cmd.didContract, cmd.AuthenticationID, proofData)
+		if err := op.AddExtension(baseAuthentication); err != nil {
+			return nil, err
+		}
+	}
+
+	if cmd.proxyPayer != nil {
+		baseProxyPayer = extras.NewBaseProxyPayer(cmd.proxyPayer)
+		if err := op.AddExtension(baseProxyPayer); err != nil {
+			return nil, err
+		}
 	}
 
 	if cmd.opSender != nil {
-		baseSettlement = common.NewBaseSettlement(cmd.opSender, cmd.proxyPayer)
-		op.SetSettlement(baseSettlement)
+		baseSettlement = extras.NewBaseSettlement(cmd.opSender)
+		if err := op.AddExtension(baseSettlement); err != nil {
+			return nil, err
+		}
 
 		err = op.HashSign(cmd.OpSenderPrivatekey, cmd.NetworkID.NetworkID())
 		if err != nil {
-			return nil, errors.Wrap(err, "create create-account operation")
+			return nil, errors.Wrapf(err, "create %T operation", op)
 		}
 	} else {
 		err = op.HashSign(cmd.Privatekey, cmd.NetworkID.NetworkID())
 		if err != nil {
-			return nil, errors.Wrap(err, "create create-account operation")
+			return nil, errors.Wrapf(err, "create %T operation", op)
 		}
+	}
+
+	if err := op.IsValid(cmd.OperationFlags.NetworkID); err != nil {
+		return nil, errors.Wrapf(err, "create %T operation", op)
 	}
 
 	return op, nil

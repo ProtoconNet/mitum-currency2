@@ -2,8 +2,8 @@ package cmds
 
 import (
 	"context"
-	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 
 	"github.com/pkg/errors"
@@ -109,8 +109,9 @@ func (cmd *WithdrawCommand) createOperation() (base.Operation, error) { // nolin
 		return nil, errors.Wrap(err, "create withdraw operation")
 	}
 
-	var baseAuthentication common.Authentication
-	var baseSettlement common.Settlement
+	var baseAuthentication extras.OperationExtension
+	var baseSettlement extras.OperationExtension
+	var baseProxyPayer extras.OperationExtension
 	var proofData = cmd.Proof
 	if cmd.IsPrivateKey {
 		prk, err := base.DecodePrivatekeyFromString(cmd.Proof, enc)
@@ -126,23 +127,38 @@ func (cmd *WithdrawCommand) createOperation() (base.Operation, error) { // nolin
 	}
 
 	if cmd.didContract != nil && cmd.AuthenticationID != "" && cmd.Proof != "" {
-		baseAuthentication = common.NewBaseAuthentication(cmd.didContract, cmd.AuthenticationID, proofData)
-		op.SetAuthentication(baseAuthentication)
+		baseAuthentication = extras.NewBaseAuthentication(cmd.didContract, cmd.AuthenticationID, proofData)
+		if err := op.AddExtension(baseAuthentication); err != nil {
+			return nil, err
+		}
+	}
+
+	if cmd.proxyPayer != nil {
+		baseProxyPayer = extras.NewBaseProxyPayer(cmd.proxyPayer)
+		if err := op.AddExtension(baseProxyPayer); err != nil {
+			return nil, err
+		}
 	}
 
 	if cmd.opSender != nil {
-		baseSettlement = common.NewBaseSettlement(cmd.opSender, cmd.proxyPayer)
-		op.SetSettlement(baseSettlement)
+		baseSettlement = extras.NewBaseSettlement(cmd.opSender)
+		if err := op.AddExtension(baseSettlement); err != nil {
+			return nil, err
+		}
 
 		err = op.HashSign(cmd.OpSenderPrivatekey, cmd.NetworkID.NetworkID())
 		if err != nil {
-			return nil, errors.Wrap(err, "create create-account operation")
+			return nil, errors.Wrapf(err, "create %T operation", op)
 		}
 	} else {
 		err = op.HashSign(cmd.Privatekey, cmd.NetworkID.NetworkID())
 		if err != nil {
-			return nil, errors.Wrap(err, "create create-account operation")
+			return nil, errors.Wrapf(err, "create %T operation", op)
 		}
+	}
+
+	if err := op.IsValid(cmd.OperationFlags.NetworkID); err != nil {
+		return nil, errors.Wrapf(err, "create %T operation", op)
 	}
 
 	return op, nil

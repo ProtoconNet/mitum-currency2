@@ -3,6 +3,8 @@ package cmds
 import (
 	"context"
 	"fmt"
+	"github.com/ProtoconNet/mitum2/base"
+	"github.com/pkg/errors"
 	"io"
 	"os"
 
@@ -99,4 +101,35 @@ type OperationExtensionFlags struct {
 	OpSender           AddressFlag    `name:"settlement-op-sender" help:"op sender account for settlement"`
 	OpSenderPrivatekey PrivatekeyFlag `name:"settlement-op-sender-privatekey" help:"op sender privatekey for settlement"`
 	ProxyPayer         AddressFlag    `name:"settlement-proxy-payer" help:"proxy payer account for settlement"`
+	didContract        base.Address
+	proxyPayer         base.Address
+	opSender           base.Address
+}
+
+func (op *OperationExtensionFlags) parseFlags(encoder encoder.Encoder) error {
+	if len(op.DIDContract.String()) > 0 {
+		a, err := op.DIDContract.Encode(encoder)
+		if err != nil {
+			return errors.Wrapf(err, "invalid did contract format, %v", op.DIDContract.String())
+		}
+		op.didContract = a
+	}
+
+	if len(op.OpSender.String()) > 0 {
+		a, err := op.OpSender.Encode(encoder)
+		if err != nil {
+			return errors.Wrapf(err, "invalid proxy payer format, %v", op.ProxyPayer.String())
+		}
+		op.opSender = a
+	}
+
+	if len(op.ProxyPayer.String()) > 0 {
+		a, err := op.ProxyPayer.Encode(encoder)
+		if err != nil {
+			return errors.Wrapf(err, "invalid proxy payer format, %v", op.ProxyPayer.String())
+		}
+		op.proxyPayer = a
+	}
+
+	return nil
 }
