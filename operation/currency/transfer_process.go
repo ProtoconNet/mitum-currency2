@@ -45,7 +45,6 @@ func (opp *TransferItemProcessor) PreProcess(
 
 	rb := map[types.CurrencyID]base.StateMergeValue{}
 
-	receiver := opp.item.Receiver()
 	amounts := opp.item.Amounts()
 	for i := range amounts {
 		am := amounts[i]
@@ -54,12 +53,6 @@ func (opp *TransferItemProcessor) PreProcess(
 		_, err := state.ExistsCurrencyPolicy(cid, getStateFunc)
 		if err != nil {
 			return e.Wrap(err)
-		}
-
-		if _, _, _, cErr := state.ExistsCAccount(
-			receiver, "receiver", true, false, getStateFunc); cErr != nil {
-			return e.Wrap(
-				common.ErrCAccountNA.Wrap(errors.Errorf("%v: receiver %v is contract account", cErr, receiver)))
 		}
 	}
 
