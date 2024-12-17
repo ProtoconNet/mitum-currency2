@@ -291,7 +291,7 @@ func (bs BaseSettlement) Equal(b BaseSettlement) bool {
 }
 
 var BaseProxyPayerHint = hint.MustNewHint("mitum-extension-base-proxy-payer-v0.0.1")
-var ProxyPayerExtensionType string = "proxyPayer"
+var ProxyPayerExtensionType string = "proxy_payer"
 
 type BaseProxyPayer struct {
 	hint.BaseHinter
