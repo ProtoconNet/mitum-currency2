@@ -72,10 +72,8 @@ func (fact UpdateRecipientFact) IsValid(b []byte) error {
 		return common.ErrFactInvalid.Wrap(err)
 	}
 
-	if n := len(fact.recipients); n < 1 {
-		return common.ErrFactInvalid.Wrap(common.ErrArrayLen.Wrap(errors.Errorf("empty recipients")))
-	} else if n > MaxRecipients {
-		return common.ErrFactInvalid.Wrap(common.ErrArrayLen.Wrap(errors.Errorf("number of recipients, %d, exceeds maximum limit, %d", n, MaxRecipients)))
+	if len(fact.recipients) > MaxRecipients {
+		return common.ErrFactInvalid.Wrap(common.ErrArrayLen.Wrap(errors.Errorf("number of recipients, %d, exceeds maximum limit, %d", len(fact.recipients), MaxRecipients)))
 	}
 
 	recipientsMap := make(map[string]struct{})
@@ -87,7 +85,7 @@ func (fact UpdateRecipientFact) IsValid(b []byte) error {
 			recipientsMap[fact.recipients[i].String()] = struct{}{}
 		}
 		if err := fact.recipients[i].IsValid(nil); err != nil {
-			return common.ErrFactInvalid.Wrap(common.ErrValOOR.Wrap(errors.Errorf("invalid recipient address %v", err)))
+			return common.ErrFactInvalid.Wrap(common.ErrValueInvalid.Wrap(errors.Errorf("invalid recipient address %v", err)))
 		}
 	}
 
