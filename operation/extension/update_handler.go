@@ -72,10 +72,8 @@ func (fact UpdateHandlerFact) IsValid(b []byte) error {
 		return common.ErrFactInvalid.Wrap(err)
 	}
 
-	if n := len(fact.handlers); n < 1 {
-		return common.ErrFactInvalid.Wrap(common.ErrArrayLen.Wrap(errors.Errorf("empty handlers")))
-	} else if n > MaxHandlers {
-		return common.ErrFactInvalid.Wrap(common.ErrArrayLen.Wrap(errors.Errorf("number of handlers, %d, exceeds maximum limit, %d", n, MaxHandlers)))
+	if len(fact.handlers) > MaxHandlers {
+		return common.ErrFactInvalid.Wrap(common.ErrArrayLen.Wrap(errors.Errorf("number of handlers, %d, exceeds maximum limit, %d", len(fact.handlers), MaxHandlers)))
 	}
 
 	handlersMap := make(map[string]struct{})
