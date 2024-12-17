@@ -244,21 +244,28 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 	}
 
 	if extOp, ok := op.(extras.OperationExtensions); ok {
-		if err := extOp.Verify(op, getStateFunc); err != nil {
-			return ctx, base.NewBaseOperationProcessReasonError(
-				common.ErrMPreProcess.Errorf("%v", err)), nil
-		}
-	} else {
-		fact := op.Fact()
-		signerFact, ok := fact.(currency.Signer)
-		if ok {
-			if err := state.CheckFactSignsByState(signerFact.Signer(), op.Signs(), getStateFunc); err != nil {
+		auth := extOp.Extension(extras.AuthenticationExtensionType)
+		settlement := extOp.Extension(extras.SettlementExtensionType)
+		if settlement != nil && auth != nil {
+			if err := extOp.Verify(op, getStateFunc); err != nil {
+				return ctx, base.NewBaseOperationProcessReasonError(
+					common.ErrMPreProcess.Errorf("%v", err)), nil
+			}
+		} else {
+			fact := op.Fact()
+			signerFact, ok := fact.(currency.Signer)
+			if ok {
+				if err := state.CheckFactSignsByState(signerFact.Signer(), op.Signs(), getStateFunc); err != nil {
+					return ctx,
+						base.NewBaseOperationProcessReasonError(
+							common.ErrMPreProcess.
+								Wrap(common.ErrMSignInvalid).
+								Errorf("%v", err),
+						), nil
+				}
+			} else {
 				return ctx,
-					base.NewBaseOperationProcessReasonError(
-						common.ErrMPreProcess.
-							Wrap(common.ErrMSignInvalid).
-							Errorf("%v", err),
-					), nil
+					nil, errors.Errorf("expected Signer, but %T", fact)
 			}
 		}
 	}
