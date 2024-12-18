@@ -31,11 +31,10 @@ var operationProcessorPool = sync.Pool{
 type GetLastBlockFunc func() (base.BlockMap, bool, error)
 
 const (
-	DuplicationTypeSender    types.DuplicationType = "sender"
-	DuplicationTypeCurrency  types.DuplicationType = "currency"
-	DuplicationTypeContract  types.DuplicationType = "contract"
-	DuplicationTypeDID       types.DuplicationType = "did"
-	DuplicationTypeDIDPubKey types.DuplicationType = "didpubkey"
+	DuplicationTypeSender     types.DuplicationType = "sender"
+	DuplicationTypeCurrency   types.DuplicationType = "currency"
+	DuplicationTypeContract   types.DuplicationType = "contract"
+	DuplicationTypeDIDAccount types.DuplicationType = "didaccount"
 )
 
 type BaseOperationProcessor interface {
@@ -519,7 +518,7 @@ func CheckDuplication(opr *OperationProcessor, op base.Operation) error {
 			return errors.Errorf("expected %T, not %T", did_registry.CreateDIDFact{}, t.Fact())
 		}
 		duplicationTypeDIDPubKey = []string{DuplicationKey(
-			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.Sender()), DuplicationTypeDIDPubKey)}
+			fmt.Sprintf("%s:%s", fact.Contract().String(), fact.Sender()), DuplicationTypeDIDAccount)}
 		duplicationTypeSenderID = DuplicationKey(fact.Sender().String(), DuplicationTypeSender)
 	default:
 		return nil
