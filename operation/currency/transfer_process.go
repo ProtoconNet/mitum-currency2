@@ -269,33 +269,21 @@ func (opp *TransferProcessor) Process( // nolint:dupl
 	default:
 	}
 
-	senderBalSts, totals, err := PrepareSenderState(fact.Sender(), required, getStateFunc)
+	totalAmounts, err := PrepareSenderTotalAmounts(fact.Sender(), required, getStateFunc)
 	if err != nil {
 		return nil, base.NewBaseOperationProcessReasonError("process CreateAccount; %w", err), nil
 	}
 
-	for cid := range senderBalSts {
-		v, ok := senderBalSts[cid].Value().(currency.BalanceStateValue)
-		if !ok {
-			return nil, base.NewBaseOperationProcessReasonError(
-				"expected %T, not %T",
-				currency.BalanceStateValue{},
-				senderBalSts[cid].Value(),
-			), nil
-		}
-
-		total, found := totals[cid]
-		if found {
-			stateMergeValues = append(
-				stateMergeValues,
-				common.NewBaseStateMergeValue(
-					senderBalSts[cid].Key(),
-					currency.NewDeductBalanceStateValue(v.Amount.WithBig(total)),
-					func(height base.Height, st base.State) base.StateValueMerger {
-						return currency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
-					}),
-			)
-		}
+	for key, total := range totalAmounts {
+		stateMergeValues = append(
+			stateMergeValues,
+			common.NewBaseStateMergeValue(
+				key,
+				currency.NewDeductBalanceStateValue(total),
+				func(height base.Height, st base.State) base.StateValueMerger {
+					return currency.NewBalanceStateValueMerger(height, key, total.Currency(), st)
+				}),
+		)
 	}
 
 	return stateMergeValues, nil, nil

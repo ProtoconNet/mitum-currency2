@@ -2,13 +2,13 @@ package extension
 
 import (
 	"context"
-	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"sync"
 
 	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"github.com/ProtoconNet/mitum-currency/v3/state"
-	currencystate "github.com/ProtoconNet/mitum-currency/v3/state/currency"
+	ccstate "github.com/ProtoconNet/mitum-currency/v3/state/currency"
 	"github.com/ProtoconNet/mitum-currency/v3/state/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
@@ -78,7 +78,7 @@ func (opp *CreateContractAccountItemProcessor) PreProcess(
 
 		}
 
-		switch _, found, err := getStateFunc(currencystate.BalanceStateKey(target, cid)); {
+		switch _, found, err := getStateFunc(ccstate.BalanceStateKey(target, cid)); {
 		case err != nil:
 			return e.Wrap(err)
 		case found:
@@ -86,12 +86,12 @@ func (opp *CreateContractAccountItemProcessor) PreProcess(
 
 		default:
 			nb[am.Currency()] = common.NewBaseStateMergeValue(
-				currencystate.BalanceStateKey(target, cid),
-				currencystate.NewAddBalanceStateValue(types.NewZeroAmount(cid)),
+				ccstate.BalanceStateKey(target, cid),
+				ccstate.NewAddBalanceStateValue(types.NewZeroAmount(cid)),
 				func(height base.Height, st base.State) base.StateValueMerger {
-					return currencystate.NewBalanceStateValueMerger(
+					return ccstate.NewBalanceStateValueMerger(
 						height,
-						currencystate.BalanceStateKey(target, cid), cid, st)
+						ccstate.BalanceStateKey(target, cid), cid, st)
 				},
 			)
 		}
@@ -107,9 +107,7 @@ func (opp *CreateContractAccountItemProcessor) Process(
 	e := util.StringError("process for CreateContractAccountItemProcessor")
 
 	sts := make([]base.StateMergeValue, len(opp.item.Amounts())+2)
-
 	nac, err := types.NewAccountFromKeys(opp.item.Keys())
-
 	if err != nil {
 		return nil, e.Wrap(err)
 	}
@@ -123,8 +121,8 @@ func (opp *CreateContractAccountItemProcessor) Process(
 	if err != nil {
 		return nil, e.Wrap(err)
 	}
-	sts[0] = state.NewStateMergeValue(opp.ns.Key(), currencystate.NewAccountStateValue(ncac))
 
+	sts[0] = state.NewStateMergeValue(opp.ns.Key(), ccstate.NewAccountStateValue(ncac))
 	cas := types.NewContractAccountStatus(opp.sender, nil)
 	sts[1] = state.NewStateMergeValue(opp.oas.Key(), extension.NewContractAccountStateValue(cas))
 
@@ -133,15 +131,15 @@ func (opp *CreateContractAccountItemProcessor) Process(
 		am := amounts[i]
 		cid := am.Currency()
 		stv := opp.nb[cid]
-		v, ok := stv.Value().(currencystate.AddBalanceStateValue)
+		v, ok := stv.Value().(ccstate.AddBalanceStateValue)
 		if !ok {
 			return nil, errors.Errorf("expected AddBalanceStateValue, not %T", stv.Value())
 		}
 		sts[i+2] = common.NewBaseStateMergeValue(
 			stv.Key(),
-			currencystate.NewAddBalanceStateValue(v.Amount.WithBig(am.Big())),
+			ccstate.NewAddBalanceStateValue(v.Amount.WithBig(am.Big())),
 			func(height base.Height, st base.State) base.StateValueMerger {
-				return currencystate.NewBalanceStateValueMerger(height, stv.Key(), cid, st)
+				return ccstate.NewBalanceStateValueMerger(height, stv.Key(), cid, st)
 			},
 		)
 	}
@@ -253,12 +251,8 @@ func (opp *CreateContractAccountProcessor) Process( // nolint:dupl
 	ctx context.Context, op base.Operation, getStateFunc base.GetStateFunc) (
 	[]base.StateMergeValue, base.OperationProcessReasonError, error,
 ) {
-	fact, ok := op.Fact().(CreateContractAccountFact)
-	if !ok {
-		return nil, nil, base.NewBaseOperationProcessReasonError("expected CreateContractAccountFact, not %T", op.Fact())
-	}
+	fact, _ := op.Fact().(CreateContractAccountFact)
 
-	//ns := make([]*CreateContractAccountItemProcessor, len(fact.items))
 	var stateMergeValues []base.StateMergeValue // nolint:prealloc
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -316,33 +310,21 @@ func (opp *CreateContractAccountProcessor) Process( // nolint:dupl
 	default:
 	}
 
-	senderBalSts, totals, err := currency.PrepareSenderState(fact.Sender(), required, getStateFunc)
+	totalAmounts, err := currency.PrepareSenderTotalAmounts(fact.Sender(), required, getStateFunc)
 	if err != nil {
 		return nil, base.NewBaseOperationProcessReasonError("process CreateAccount; %w", err), nil
 	}
 
-	for cid := range senderBalSts {
-		v, ok := senderBalSts[cid].Value().(currencystate.BalanceStateValue)
-		if !ok {
-			return nil, base.NewBaseOperationProcessReasonError(
-				"expected %T, not %T",
-				currencystate.BalanceStateValue{},
-				senderBalSts[cid].Value(),
-			), nil
-		}
-
-		total, found := totals[cid]
-		if found {
-			stateMergeValues = append(
-				stateMergeValues,
-				common.NewBaseStateMergeValue(
-					senderBalSts[cid].Key(),
-					currencystate.NewDeductBalanceStateValue(v.Amount.WithBig(total)),
-					func(height base.Height, st base.State) base.StateValueMerger {
-						return currencystate.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
-					}),
-			)
-		}
+	for key, total := range totalAmounts {
+		stateMergeValues = append(
+			stateMergeValues,
+			common.NewBaseStateMergeValue(
+				key,
+				ccstate.NewDeductBalanceStateValue(total),
+				func(height base.Height, st base.State) base.StateValueMerger {
+					return ccstate.NewBalanceStateValueMerger(height, key, total.Currency(), st)
+				}),
+		)
 	}
 
 	return stateMergeValues, nil, nil

@@ -6,10 +6,8 @@ import (
 	"sync"
 
 	"github.com/ProtoconNet/mitum-currency/v3/common"
-	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
 	"github.com/ProtoconNet/mitum-currency/v3/state"
-	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
-	"github.com/ProtoconNet/mitum-currency/v3/state/extension"
+	ccstate "github.com/ProtoconNet/mitum-currency/v3/state/currency"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 
@@ -253,33 +251,26 @@ func (opp *WithdrawProcessor) Process( // nolint:dupl
 	default:
 	}
 
-	senderBalSts, totals, err := currency.PrepareSenderState(fact.Sender(), required, getStateFunc)
-	if err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("process CreateAccount; %w", err), nil
+	totalAmounts := map[string]types.Amount{}
+	for cid, rqs := range required {
+		total := common.ZeroBig
+		for i := range rqs {
+			total = total.Add(rqs[i])
+		}
+
+		totalAmounts[ccstate.BalanceStateKey(fact.Sender(), cid)] = types.NewAmount(total, cid)
 	}
 
-	for cid := range senderBalSts {
-		v, ok := senderBalSts[cid].Value().(statecurrency.BalanceStateValue)
-		if !ok {
-			return nil, base.NewBaseOperationProcessReasonError(
-				"expected %T, not %T",
-				statecurrency.BalanceStateValue{},
-				senderBalSts[cid].Value(),
-			), nil
-		}
-
-		total, found := totals[cid]
-		if found {
-			stateMergeValues = append(
-				stateMergeValues,
-				common.NewBaseStateMergeValue(
-					senderBalSts[cid].Key(),
-					statecurrency.NewDeductBalanceStateValue(v.Amount.WithBig(total)),
-					func(height base.Height, st base.State) base.StateValueMerger {
-						return statecurrency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
-					}),
-			)
-		}
+	for key, total := range totalAmounts {
+		stateMergeValues = append(
+			stateMergeValues,
+			common.NewBaseStateMergeValue(
+				key,
+				ccstate.NewAddBalanceStateValue(total),
+				func(height base.Height, st base.State) base.StateValueMerger {
+					return ccstate.NewBalanceStateValueMerger(height, key, total.Currency(), st)
+				}),
+		)
 	}
 
 	return stateMergeValues, nil, nil
