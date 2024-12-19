@@ -249,33 +249,21 @@ func (opp *CreateAccountProcessor) Process( // nolint:dupl
 	default:
 	}
 
-	senderBalSts, totals, err := PrepareSenderState(fact.Sender(), required, getStateFunc)
+	totalAmounts, err := PrepareSenderTotalAmounts(fact.Sender(), required, getStateFunc)
 	if err != nil {
 		return nil, base.NewBaseOperationProcessReasonError("process CreateAccount; %w", err), nil
 	}
 
-	for cid := range senderBalSts {
-		v, ok := senderBalSts[cid].Value().(currency.BalanceStateValue)
-		if !ok {
-			return nil, base.NewBaseOperationProcessReasonError(
-				"expected %T, not %T",
-				currency.BalanceStateValue{},
-				senderBalSts[cid].Value(),
-			), nil
-		}
-
-		total, found := totals[cid]
-		if found {
-			stateMergeValues = append(
-				stateMergeValues,
-				common.NewBaseStateMergeValue(
-					senderBalSts[cid].Key(),
-					currency.NewDeductBalanceStateValue(v.Amount.WithBig(total)),
-					func(height base.Height, st base.State) base.StateValueMerger {
-						return currency.NewBalanceStateValueMerger(height, senderBalSts[cid].Key(), cid, st)
-					}),
-			)
-		}
+	for key, total := range totalAmounts {
+		stateMergeValues = append(
+			stateMergeValues,
+			common.NewBaseStateMergeValue(
+				key,
+				currency.NewDeductBalanceStateValue(total),
+				func(height base.Height, st base.State) base.StateValueMerger {
+					return currency.NewBalanceStateValueMerger(height, key, total.Currency(), st)
+				}),
+		)
 	}
 
 	return stateMergeValues, nil, nil
@@ -294,13 +282,12 @@ func (opp *CreateAccountProcessor) Close() error {
 	return nil
 }
 
-func PrepareSenderState(
+func PrepareSenderTotalAmounts(
 	holder base.Address,
 	required map[types.CurrencyID][]common.Big,
 	getStateFunc base.GetStateFunc,
-) (map[types.CurrencyID]base.State, map[types.CurrencyID]common.Big, error) {
-	sbSts := map[types.CurrencyID]base.State{}
-	totalMap := map[types.CurrencyID]common.Big{}
+) (map[string]types.Amount, error) {
+	totalAmounts := map[string]types.Amount{}
 
 	for cid, rqs := range required {
 		total := common.ZeroBig
@@ -308,14 +295,13 @@ func PrepareSenderState(
 			total = total.Add(rqs[i])
 		}
 
-		st, err := state.ExistsState(currency.BalanceStateKey(holder, cid), fmt.Sprintf("balance of account, %v", holder), getStateFunc)
+		_, err := state.ExistsState(currency.BalanceStateKey(holder, cid), fmt.Sprintf("balance of account, %v", holder), getStateFunc)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
-		totalMap[cid] = total
-		sbSts[cid] = st
+		totalAmounts[currency.BalanceStateKey(holder, cid)] = types.NewAmount(total, cid)
 	}
 
-	return sbSts, totalMap, nil
+	return totalAmounts, nil
 }
