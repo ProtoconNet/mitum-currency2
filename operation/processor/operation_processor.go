@@ -12,7 +12,7 @@ import (
 	"github.com/ProtoconNet/mitum-currency/v3/operation/did-registry"
 	"github.com/ProtoconNet/mitum-currency/v3/operation/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/state"
-	statecurrency "github.com/ProtoconNet/mitum-currency/v3/state/currency"
+	ccstate "github.com/ProtoconNet/mitum-currency/v3/state/currency"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
@@ -291,7 +291,6 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 
 	stateMergeValues, reasonErr, err := sp.Process(ctx, op, getStateFunc)
 
-	var isUserOperation bool
 	var payer base.Address
 	switch i := op.Fact().(type) {
 	case extras.FeeAble:
@@ -303,7 +302,6 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 			iSettlement := k.Extension(extras.SettlementExtensionType)
 			iProxyPayer := k.Extension(extras.ProxyPayerExtensionType)
 			if iAuth != nil && iSettlement != nil {
-				isUserOperation = true
 				settlement, ok := iSettlement.(extras.Settlement)
 				if !ok {
 					return nil, nil, e.Errorf("expected Settlement, but %T", iSettlement)
@@ -328,7 +326,6 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 		}
 
 		feeReceiveSts := map[types.CurrencyID]base.State{}
-		var sendRequired = make(map[types.CurrencyID]common.Big)
 		var feeRequired = make(map[types.CurrencyID]common.Big)
 
 		for cid, amounts := range feeBase {
@@ -341,9 +338,9 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 				continue
 			}
 
-			if err := state.CheckExistsState(statecurrency.AccountStateKey(receiver), getStateFunc); err != nil {
+			if err := state.CheckExistsState(ccstate.AccountStateKey(receiver), getStateFunc); err != nil {
 				return nil, nil, errors.Errorf("Feeer receiver account not found, %s", receiver)
-			} else if st, found, err := getStateFunc(statecurrency.BalanceStateKey(receiver, cid)); err != nil {
+			} else if st, found, err := getStateFunc(ccstate.BalanceStateKey(receiver, cid)); err != nil {
 				return nil, nil, errors.Errorf("Feeer receiver account not found, %s", receiver)
 			} else if !found {
 				return nil, nil, errors.Errorf("Feeer receiver account not found, %s", receiver)
@@ -351,7 +348,6 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 				feeReceiveSts[cid] = st
 			}
 
-			total := common.ZeroBig
 			rq := common.ZeroBig
 			for _, big := range amounts {
 				switch k, err := policy.Feeer().Fee(big); {
@@ -360,42 +356,27 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 				default:
 					rq = rq.Add(k)
 				}
-				total = total.Add(big)
 			}
 			if v, found := feeRequired[cid]; !found {
 				feeRequired[cid] = rq
 			} else {
 				feeRequired[cid] = v.Add(rq)
 			}
-			sendRequired[cid] = total
 		}
 
 		for cid, rq := range feeRequired {
-			payerSt, err := state.ExistsState(statecurrency.BalanceStateKey(payer, cid), fmt.Sprintf("balance of fee payer, %v", payer), getStateFunc)
+			payerSt, err := state.ExistsState(ccstate.BalanceStateKey(payer, cid), fmt.Sprintf("balance of fee payer, %v", payer), getStateFunc)
 			if err != nil {
 				return nil, nil, e.Wrap(err)
 			}
 
-			payerBalValue, ok := payerSt.Value().(statecurrency.BalanceStateValue)
+			payerBalValue, ok := payerSt.Value().(ccstate.BalanceStateValue)
 			if !ok {
 				return nil, base.NewBaseOperationProcessReasonError(
 					"expected %T, not %T",
-					statecurrency.BalanceStateValue{},
+					ccstate.BalanceStateValue{},
 					payerSt.Value(),
 				), nil
-			}
-
-			if !isUserOperation {
-				req := sendRequired[cid].Add(rq)
-				if payerBalValue.Amount.Big().Compare(req) < 0 {
-					return nil, base.NewBaseOperationProcessReasonError(
-						"account, %s balance insufficient; %d < required %d", payer.String(), payerBalValue.Amount.Big(), rq), nil
-				}
-			} else {
-				if payerBalValue.Amount.Big().Compare(rq) < 0 {
-					return nil, base.NewBaseOperationProcessReasonError(
-						"account, %s balance insufficient; %d < required %d", payer.String(), payerBalValue.Amount.Big(), rq), nil
-				}
 			}
 
 			feeReceiverSt, feeReceiverFound := feeReceiveSts[cid]
@@ -403,16 +384,16 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 				if payerSt.Key() != feeReceiverSt.Key() {
 					stateMergeValues = append(stateMergeValues, common.NewBaseStateMergeValue(
 						payerSt.Key(),
-						statecurrency.NewDeductBalanceStateValue(payerBalValue.Amount.WithBig(rq)),
+						ccstate.NewDeductBalanceStateValue(payerBalValue.Amount.WithBig(rq)),
 						func(height base.Height, st base.State) base.StateValueMerger {
-							return statecurrency.NewBalanceStateValueMerger(height, st.Key(), cid, st)
+							return ccstate.NewBalanceStateValueMerger(height, st.Key(), cid, st)
 						},
 					))
-					r, ok := feeReceiveSts[cid].Value().(statecurrency.BalanceStateValue)
+					r, ok := feeReceiveSts[cid].Value().(ccstate.BalanceStateValue)
 					if !ok {
 						return nil, base.NewBaseOperationProcessReasonError(
 							"expected %T, not %T",
-							statecurrency.BalanceStateValue{},
+							ccstate.BalanceStateValue{},
 							feeReceiveSts[cid].Value(),
 						), nil
 					}
@@ -420,9 +401,9 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 						stateMergeValues,
 						common.NewBaseStateMergeValue(
 							feeReceiveSts[cid].Key(),
-							statecurrency.NewAddBalanceStateValue(r.Amount.WithBig(rq)),
+							ccstate.NewAddBalanceStateValue(r.Amount.WithBig(rq)),
 							func(height base.Height, st base.State) base.StateValueMerger {
-								return statecurrency.NewBalanceStateValueMerger(height, feeReceiveSts[cid].Key(), cid, st)
+								return ccstate.NewBalanceStateValueMerger(height, feeReceiveSts[cid].Key(), cid, st)
 							},
 						),
 					)
@@ -430,6 +411,14 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 			}
 		}
 	default:
+	}
+
+	reasonErr, err = CheckBalanceStateMergeValue(stateMergeValues, getStateFunc)
+	if reasonErr != nil {
+		return nil, reasonErr, nil
+	}
+	if err != nil {
+		return nil, nil, e.Wrap(err)
 	}
 
 	return stateMergeValues, reasonErr, err
@@ -708,4 +697,75 @@ func (opr *OperationProcessor) close() {
 	operationProcessorPool.Put(opr)
 
 	opr.Log().Debug().Msg("operation processors closed")
+}
+
+func CheckBalanceStateMergeValue(stateMergeValues []base.StateMergeValue, getStateFunc base.GetStateFunc) (base.OperationProcessReasonError, error) {
+	type BalanceValue struct {
+		address  string
+		add      common.Big
+		remove   common.Big
+		currency types.CurrencyID
+	}
+
+	balanceValues := make(map[string]BalanceValue)
+	for i := range stateMergeValues {
+		if ccstate.IsBalanceStateKey(stateMergeValues[i].Key()) {
+			suffix := ccstate.BalanceStateKeySuffix[1:]
+			parsed, err := state.ParseStateKeyBySuffix(stateMergeValues[i].Key(), suffix, 3)
+			if err != nil {
+				return nil, err
+			}
+			bv, found := balanceValues[stateMergeValues[i].Key()]
+			if !found {
+				bv = BalanceValue{
+					address:  parsed[0],
+					add:      common.ZeroBig,
+					remove:   common.ZeroBig,
+					currency: types.CurrencyID(parsed[1]),
+				}
+			}
+			switch t := stateMergeValues[i].Value().(type) {
+			case ccstate.AddBalanceStateValue:
+				bv.add = bv.add.Add(t.Amount.Big())
+			case ccstate.DeductBalanceStateValue:
+				bv.remove = bv.remove.Add(t.Amount.Big())
+			default:
+				return nil, errors.Errorf("Unsupported balance state value, %T", stateMergeValues[i].Value())
+			}
+
+			balanceValues[stateMergeValues[i].Key()] = bv
+		}
+	}
+
+	for stk, bv := range balanceValues {
+		switch st, _, err := getStateFunc(stk); {
+		case err != nil:
+			return nil, err
+		default:
+			var existing common.Big
+			if st == nil {
+				existing = common.ZeroBig
+			} else if st.Value() != nil {
+				value, ok := st.Value().(ccstate.BalanceStateValue)
+				if ok {
+					existing = value.Amount.Big()
+				} else {
+					return nil, errors.Errorf("expected BalanceStateValue, but %T", st.Value())
+				}
+			}
+			if bv.add.OverZero() {
+				existing = existing.Add(bv.add)
+			}
+			if bv.remove.OverZero() {
+				existing = existing.Sub(bv.remove)
+			}
+
+			if !existing.OverNil() {
+				return base.NewBaseOperationProcessReasonError(
+					"account %s has insufficient balance. It is short by %v.", bv.address, existing), nil
+			}
+		}
+	}
+
+	return nil, nil
 }
