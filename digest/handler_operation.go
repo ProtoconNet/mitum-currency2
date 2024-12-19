@@ -11,7 +11,7 @@ import (
 	"github.com/ProtoconNet/mitum-currency/v3/operation/currency"
 
 	"github.com/ProtoconNet/mitum2/base"
-	mitumutil "github.com/ProtoconNet/mitum2/util"
+	"github.com/ProtoconNet/mitum2/util"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
@@ -44,7 +44,7 @@ func (hd *Handlers) handleOperation(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (hd *Handlers) handleOperationInGroup(h mitumutil.Hash) ([]byte, error) {
+func (hd *Handlers) handleOperationInGroup(h util.Hash) ([]byte, error) {
 	var (
 		va  OperationValue
 		err error
@@ -53,7 +53,7 @@ func (hd *Handlers) handleOperationInGroup(h mitumutil.Hash) ([]byte, error) {
 	case err != nil:
 		return nil, err
 	//case !found:
-	//return nil, mitumutil.ErrNotFound.Errorf("operation %v in handleOperation", h)
+	//return nil, util.ErrNotFound.Errorf("operation %v in handleOperation", h)
 	default:
 		hal, err := hd.buildOperationHal(va)
 		if err != nil {
@@ -117,7 +117,7 @@ func (hd *Handlers) handleOperationsInGroup(offset string, reverse bool, l int64
 	case e != nil:
 		return nil, false, e
 	case len(l) < 1:
-		return nil, false, mitumutil.ErrNotFound.Errorf("Operations in handleOperations")
+		return nil, false, util.ErrNotFound.Errorf("Operations in handleOperations")
 	default:
 		vas = l
 		opsCount = count
@@ -205,7 +205,7 @@ func (hd *Handlers) handleOperationsByHeightInGroup(
 	case e != nil:
 		return nil, false, e
 	case len(l) < 1:
-		return nil, false, mitumutil.ErrNotFound.Errorf("Operations in handleOperationsByHeight")
+		return nil, false, util.ErrNotFound.Errorf("Operations in handleOperationsByHeight")
 	default:
 		vas = l
 		opsCount = count
@@ -506,7 +506,7 @@ func (hd *Handlers) loadOperationsHALFromDatabase(filter bson.M, reverse bool, l
 	var opsCount int64
 	if err := hd.database.Operations(
 		filter, true, reverse, limit,
-		func(_ mitumutil.Hash, va OperationValue, count int64) (bool, error) {
+		func(_ util.Hash, va OperationValue, count int64) (bool, error) {
 			hal, err := hd.buildOperationHal(va)
 			if err != nil {
 				return false, err
