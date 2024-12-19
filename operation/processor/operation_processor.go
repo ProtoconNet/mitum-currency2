@@ -209,28 +209,25 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 	}
 
 	if fact, ok := op.(extras.FactUser); ok {
-		if err := extras.VerifyFactUser(fact.FactUser(), getStateFunc); err != nil {
+		if err := extras.VerifyFactUser(fact, getStateFunc); err != nil {
 			return ctx, err, nil
 		}
 	}
 
 	if fact, ok := op.(extras.InActiveContractOwnerHandlerOnly); ok {
-		contract, sender := fact.InActiveContractOwnerHandlerOnly()
-		if err := extras.VerifyInActiveContractOwnerHandlerOnly(contract, sender, getStateFunc); err != nil {
+		if err := extras.VerifyInActiveContractOwnerHandlerOnly(fact, getStateFunc); err != nil {
 			return ctx, err, nil
 		}
 	}
 
 	if fact, ok := op.(extras.ContractOwnerOnly); ok {
-		contract, sender := fact.ContractOwnerOnly()
-		if err := extras.VerifyContractOwnerOnly(contract, sender, getStateFunc); err != nil {
+		if err := extras.VerifyContractOwnerOnly(fact, getStateFunc); err != nil {
 			return ctx, err, nil
 		}
 	}
 
 	if fact, ok := op.(extras.ActiveContract); ok {
-		contract := fact.ActiveContract()
-		if err := extras.VerifyActiveContract(contract, getStateFunc); err != nil {
+		if err := extras.VerifyActiveContract(fact, getStateFunc); err != nil {
 			return ctx, err, nil
 		}
 	}

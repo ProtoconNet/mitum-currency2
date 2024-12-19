@@ -539,7 +539,17 @@ type FactUser interface {
 	FactUser() base.Address
 }
 
-func VerifyFactUser(user base.Address, getStateFunc base.GetStateFunc) base.OperationProcessReasonError {
+// VerifyFactUser function checks
+// existence of user account
+// it is not a contract account
+func VerifyFactUser(fact FactUser, getStateFunc base.GetStateFunc) base.OperationProcessReasonError {
+	user := fact.FactUser()
+
+	if user == nil {
+		return base.NewBaseOperationProcessReasonError(
+			common.ErrMPreProcess.
+				Errorf("empty user account"))
+	}
 	if _, _, aErr, cErr := state.ExistsCAccount(user, "sender", true, false, getStateFunc); aErr != nil {
 		return base.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.Errorf("%v", aErr))
@@ -552,94 +562,144 @@ func VerifyFactUser(user base.Address, getStateFunc base.GetStateFunc) base.Oper
 }
 
 type ContractOwnerOnly interface {
-	ContractOwnerOnly() (base.Address, base.Address)
+	ContractOwnerOnly() [][2]base.Address // contract, sender
 }
 
-func VerifyContractOwnerOnly(contract, sender base.Address, getStateFunc base.GetStateFunc) base.OperationProcessReasonError {
-	if _, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc); aErr != nil {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", aErr))
-	} else if cErr != nil {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", cErr))
-	} else if status, err := estate.StateContractAccountValue(cSt); err != nil {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMStateValInvalid).
-				Errorf("%v", cErr))
-	} else if !status.Owner().Equal(sender) {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMAccountNAth).
-				Errorf("sender %v is not owner of contract account", sender))
+// VerifyContractOwnerOnly function checks
+// existence of contract account
+// sender is owner of contract account
+func VerifyContractOwnerOnly(fact ContractOwnerOnly, getStateFunc base.GetStateFunc) base.OperationProcessReasonError {
+	for _, addresses := range fact.ContractOwnerOnly() {
+		contract := addresses[0]
+		sender := addresses[1]
+		if contract == nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("empty contract account"))
+		}
+		if sender == nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("empty sender account"))
+		}
+
+		if _, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc); aErr != nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("%v", aErr))
+		} else if cErr != nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("%v", cErr))
+		} else if status, err := estate.StateContractAccountValue(cSt); err != nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Wrap(common.ErrMStateValInvalid).
+					Errorf("%v", cErr))
+		} else if !status.Owner().Equal(sender) {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Wrap(common.ErrMAccountNAth).
+					Errorf("sender %v is not owner of contract account", sender))
+		}
 	}
 
 	return nil
 }
 
 type InActiveContractOwnerHandlerOnly interface {
-	InActiveContractOwnerHandlerOnly() (base.Address, base.Address)
+	InActiveContractOwnerHandlerOnly() [][2]base.Address // contract, sender
 }
 
-func VerifyInActiveContractOwnerHandlerOnly(contract, sender base.Address, getStateFunc base.GetStateFunc) base.OperationProcessReasonError {
-	_, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc)
-	if aErr != nil {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", aErr))
-	} else if cErr != nil {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", cErr))
-	}
+// VerifyInActiveContractOwnerHandlerOnly function checks
+// existence of contract account
+// sender is owner of contract account
+// inactive contract account
+func VerifyInActiveContractOwnerHandlerOnly(fact InActiveContractOwnerHandlerOnly, getStateFunc base.GetStateFunc) base.OperationProcessReasonError {
+	for _, addresses := range fact.InActiveContractOwnerHandlerOnly() {
+		contract := addresses[0]
+		sender := addresses[1]
 
-	ca, err := estate.CheckCAAuthFromState(cSt, sender)
-	if err != nil {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", err))
-	}
+		if contract == nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("empty contract account"))
+		}
+		if sender == nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("empty sender account"))
+		}
 
-	if ca.IsActive() {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMServiceE).Errorf(
-				"contract account %v has already been activated", contract))
+		_, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc)
+		if aErr != nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("%v", aErr))
+		} else if cErr != nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("%v", cErr))
+		}
+
+		ca, err := estate.CheckCAAuthFromState(cSt, sender)
+		if err != nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("%v", err))
+		}
+
+		if ca.IsActive() {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Wrap(common.ErrMServiceE).Errorf(
+					"contract account %v has already been activated", contract))
+		}
 	}
 
 	return nil
 }
 
 type ActiveContract interface {
-	ActiveContract() base.Address
+	ActiveContract() []base.Address
 }
 
-func VerifyActiveContract(contract base.Address, getStateFunc base.GetStateFunc) base.OperationProcessReasonError {
-	_, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc)
-	if aErr != nil {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", aErr))
-	} else if cErr != nil {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", cErr))
+// VerifyActiveContract function checks
+// existence of contract account
+// active contract account
+func VerifyActiveContract(fact ActiveContract, getStateFunc base.GetStateFunc) base.OperationProcessReasonError {
+	for _, contract := range fact.ActiveContract() {
+		if contract == nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("empty contract account"))
+		}
+
+		_, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc)
+		if aErr != nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("%v", aErr))
+		} else if cErr != nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("%v", cErr))
+		}
+
+		ca, err := estate.LoadCAStateValue(cSt)
+		if err != nil {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Errorf("%v", err))
+		}
+
+		if !ca.IsActive() {
+			return base.NewBaseOperationProcessReasonError(
+				common.ErrMPreProcess.
+					Wrap(common.ErrMServiceE).Errorf(
+					"contract account %v has not been activated", contract))
+		}
 	}
 
-	ca, err := estate.LoadCAStateValue(cSt)
-	if err != nil {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Errorf("%v", err))
-	}
-
-	if !ca.IsActive() {
-		return base.NewBaseOperationProcessReasonError(
-			common.ErrMPreProcess.
-				Wrap(common.ErrMServiceE).Errorf(
-				"contract account %v has not been activated", contract))
-	}
 	return nil
 }
