@@ -330,7 +330,7 @@ func (opp *CreateContractAccountProcessor) Process( // nolint:dupl
 			}
 
 			c.h = op.Hash()
-			c.item = fact.items[i]
+			c.item = item
 			c.sender = fact.Sender()
 
 			if err := c.PreProcess(ctx, op, getStateFunc); err != nil {
@@ -351,15 +351,15 @@ func (opp *CreateContractAccountProcessor) Process( // nolint:dupl
 
 			c.Close()
 		}(fact.items[i])
-		go func() {
-			wg.Wait()
-			close(errChan)
-		}()
+	}
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
 
-		for err := range errChan {
-			if err != nil {
-				return nil, *err, nil
-			}
+	for err := range errChan {
+		if err != nil {
+			return nil, *err, nil
 		}
 	}
 
