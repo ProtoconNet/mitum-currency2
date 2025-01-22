@@ -196,7 +196,7 @@ func (fact CreateAccountFact) FeeBase() map[types.CurrencyID][]common.Big {
 			var k []common.Big
 			if arr, found := required[cid]; found {
 				arr = append(arr, big)
-				copy(k, arr)
+				k = append(k, arr...)
 			} else {
 				k = append(k, big)
 			}
