@@ -273,7 +273,9 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 				}
 			} else {
 				return ctx,
-					nil, errors.Errorf("expected Signer, but %T", fact)
+					base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Wrap(common.ErrMTypeMismatch).
+							Errorf("expected Signer but %T", fact)), nil
 			}
 		}
 	}
@@ -281,19 +283,24 @@ func (opr *OperationProcessor) PreProcess(ctx context.Context, op base.Operation
 	return ctx, nil, nil
 }
 
-func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, getStateFunc base.GetStateFunc) ([]base.StateMergeValue, base.OperationProcessReasonError, error) {
+func (opr *OperationProcessor) Process(
+	ctx context.Context, op base.Operation, getStateFunc base.GetStateFunc,
+) ([]base.StateMergeValue, base.OperationProcessReasonError, error) {
 	e := util.StringError("process for OperationProcessor")
 
 	var sp base.OperationProcessor
 	if opr.GetNewProcessorFunc == nil {
-		return nil, nil, e.Errorf("GetNewProcessorFunc is nil")
+		return nil, base.NewBaseOperationProcessReasonError(
+			common.ErrMPreProcess.Errorf("failed to GetNewProcessorFunc")), nil
 	}
 
 	switch i, known, err := opr.GetNewProcessorFunc(opr, op); {
 	case err != nil:
-		return nil, nil, e.Wrap(err)
+		return nil, base.NewBaseOperationProcessReasonError(
+			common.ErrMPreProcess.Errorf("%v", err)), nil
 	case !known:
-		return nil, nil, e.Errorf("getNewProcessor")
+		return nil, base.NewBaseOperationProcessReasonError(
+			common.ErrMPreProcess.Errorf("getNewProcessor for op %T", op)), nil
 	default:
 		sp = i
 	}
@@ -319,18 +326,24 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 			if iAuth != nil && iSettlement != nil {
 				settlement, ok := iSettlement.(extras.Settlement)
 				if !ok {
-					return nil, nil, e.Errorf("expected Settlement, but %T", iSettlement)
+					return nil, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Wrap(common.ErrMTypeMismatch).
+							Errorf("expected Settlement, but %T", iSettlement)), nil
 				}
 				opSender := settlement.OpSender()
 				if opSender == nil {
-					return nil, nil, e.Errorf("empty op sender")
+					return nil, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.
+							Errorf("failed to get op sender, empty op sender")), nil
 				}
 				payer = opSender
 			}
 			if iProxyPayer != nil {
 				proxyPayer, ok := iProxyPayer.(extras.ProxyPayer)
 				if !ok {
-					return nil, nil, e.Errorf("expected ProxyPayer, but %T", iProxyPayer)
+					return nil, base.NewBaseOperationProcessReasonError(
+						common.ErrMPreProcess.Wrap(common.ErrMTypeMismatch).
+							Errorf("expected ProxyPayer, but %T", iProxyPayer)), nil
 				}
 
 				if proxyPayer := proxyPayer.ProxyPayer(); proxyPayer != nil {
@@ -346,7 +359,9 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 		for cid, amounts := range feeBase {
 			policy, err := state.ExistsCurrencyPolicy(cid, getStateFunc)
 			if err != nil {
-				return nil, nil, err
+				return nil, base.NewBaseOperationProcessReasonError(
+					common.ErrMPreProcess.
+						Errorf("%v", err)), nil
 			}
 			receiver := policy.Feeer().Receiver()
 			if receiver == nil {
@@ -354,11 +369,17 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 			}
 
 			if err := state.CheckExistsState(ccstate.AccountStateKey(receiver), getStateFunc); err != nil {
-				return nil, nil, errors.Errorf("Feeer receiver account not found, %s", receiver)
+				return nil, base.NewBaseOperationProcessReasonError(
+						common.ErrMAccountNF.Errorf("Feeer receiver, %v", receiver)),
+					nil
 			} else if st, found, err := getStateFunc(ccstate.BalanceStateKey(receiver, cid)); err != nil {
-				return nil, nil, errors.Errorf("Feeer receiver account not found, %s", receiver)
+				return nil, base.NewBaseOperationProcessReasonError(
+						common.ErrMStateNF.Errorf("Feeer receiver, %v BalanceState: %v", receiver, err)),
+					nil
 			} else if !found {
-				return nil, nil, errors.Errorf("Feeer receiver account not found, %s", receiver)
+				return nil, base.NewBaseOperationProcessReasonError(
+						common.ErrMStateNF.Errorf("Feeer receiver, %v BalanceState", receiver)),
+					nil
 			} else {
 				feeReceiveSts[cid] = st
 			}
@@ -367,7 +388,9 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 			for _, big := range amounts {
 				switch k, err := policy.Feeer().Fee(big); {
 				case err != nil:
-					return nil, nil, err
+					return nil,
+						base.NewBaseOperationProcessReasonError("check fee of currency %v; %w", cid, err),
+						nil
 				default:
 					rq = rq.Add(k)
 				}
@@ -382,16 +405,19 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 		for cid, rq := range feeRequired {
 			payerSt, err := state.ExistsState(ccstate.BalanceStateKey(payer, cid), fmt.Sprintf("balance of fee payer, %v", payer), getStateFunc)
 			if err != nil {
-				return nil, nil, e.Wrap(err)
+				return nil, base.NewBaseOperationProcessReasonError(
+						common.ErrMStateNF.Errorf("fee payer, %v BalanceState: %v", payer, err)),
+					nil
 			}
 
 			payerBalValue, ok := payerSt.Value().(ccstate.BalanceStateValue)
 			if !ok {
 				return nil, base.NewBaseOperationProcessReasonError(
-					"expected %T, not %T",
-					ccstate.BalanceStateValue{},
-					payerSt.Value(),
-				), nil
+						common.ErrMPreProcess.Wrap(common.ErrMTypeMismatch).
+							Errorf("expected %T, not %T",
+								ccstate.BalanceStateValue{},
+								payerSt.Value())),
+					nil
 			}
 
 			feeReceiverSt, feeReceiverFound := feeReceiveSts[cid]
@@ -407,10 +433,10 @@ func (opr *OperationProcessor) Process(ctx context.Context, op base.Operation, g
 					r, ok := feeReceiveSts[cid].Value().(ccstate.BalanceStateValue)
 					if !ok {
 						return nil, base.NewBaseOperationProcessReasonError(
-							"expected %T, not %T",
-							ccstate.BalanceStateValue{},
-							feeReceiveSts[cid].Value(),
-						), nil
+								"expected %T, not %T",
+								ccstate.BalanceStateValue{},
+								feeReceiveSts[cid].Value()),
+							nil
 					}
 					stateMergeValues = append(
 						stateMergeValues,
@@ -758,12 +784,14 @@ func CheckBalanceStateMergeValue(stateMergeValues []base.StateMergeValue, getSta
 			return nil, err
 		default:
 			var existing common.Big
+			var amount common.Big
 			if st == nil {
 				existing = common.ZeroBig
 			} else if st.Value() != nil {
 				value, ok := st.Value().(ccstate.BalanceStateValue)
 				if ok {
 					existing = value.Amount.Big()
+					amount = value.Amount.Big()
 				} else {
 					return nil, errors.Errorf("expected BalanceStateValue, but %T", st.Value())
 				}
@@ -777,7 +805,7 @@ func CheckBalanceStateMergeValue(stateMergeValues []base.StateMergeValue, getSta
 			}
 			if !existing.OverNil() {
 				return base.NewBaseOperationProcessReasonError(
-					"account %s has insufficient balance. It is short by %v.", bv.address, existing), nil
+					"account, %s balance insufficient; %d < required %d", bv.address, amount, amount.Sub(existing)), nil
 			}
 		}
 	}

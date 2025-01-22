@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"github.com/ProtoconNet/mitum-currency/v3/common"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/ProtoconNet/mitum2/util/hint"
@@ -95,14 +96,14 @@ func NewDIDResource(method, methodSpecificID string) DIDResource {
 func NewDIDResourceFromString(didURL string) (*DIDResource, error) {
 	u, err := url.Parse(didURL)
 	if err != nil {
-		return nil, err
+		return nil, common.ErrValueInvalid.Wrap(err)
 	}
 
 	didResource := u
 	did := fmt.Sprintf("%s:%s", DIDPrefix, didResource.Opaque)
 	method, methodSpecificID, err := ParseDIDScheme(did)
 	if err != nil {
-		return nil, err
+		return nil, common.ErrValueInvalid.Wrap(err)
 	}
 
 	return &DIDResource{
@@ -136,10 +137,10 @@ func (d *DIDResource) SetFragment(fragment string) {
 func (d DIDResource) IsValid([]byte) error {
 	didStrings := strings.Split(d.DID(), DIDSeparator)
 	if len(didStrings) != 3 {
-		return errors.Errorf("invalid did scheme, %v", d.DID())
+		return errors.Errorf("invalid DID scheme, %v", d.DID())
 	}
 	if didStrings[0] != DIDPrefix {
-		return errors.Errorf("invalid did scheme, %v", d.DID())
+		return errors.Errorf("invalid DID scheme, %v", d.DID())
 	}
 
 	return nil
@@ -168,12 +169,12 @@ func (d DIDResource) Equal(b DIDResource) bool {
 func ParseDIDScheme(did string) (method, methodSpecificID string, err error) {
 	didStrings := strings.Split(did, DIDSeparator)
 	if len(didStrings) != 3 {
-		err = errors.Errorf("invalid did scheme, %v", did)
+		err = errors.Errorf("invalid DID scheme, %v", did)
 		return
 	}
 
 	if didStrings[0] != DIDPrefix {
-		err = errors.Errorf("invalid did scheme, %v", did)
+		err = errors.Errorf("invalid DID scheme, %v", did)
 		return
 	}
 

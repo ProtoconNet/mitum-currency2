@@ -128,27 +128,27 @@ func (ba BaseAuthentication) Verify(op base.Operation, getStateFunc base.GetStat
 	case FeeAble:
 		factSender := i.FeePayer()
 		if dr.MethodSpecificID() != factSender.String() {
-			return errors.Errorf("fact sender is not matched with authentication id controller")
+			return common.ErrAccountNAth.Errorf("fact sender is not matched with authentication id controller")
 		}
 	}
 
 	contract := ba.Contract()
 	if contract == nil {
-		return errors.Errorf("empty contract address")
+		return common.ErrValueInvalid.Errorf("empty contract address")
 	}
 	if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
-		return err
+		return common.ErrStateNF.Wrap(err)
 	} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
 		return err
 	}
 
 	authentication, err = doc.Authentication(ba.AuthenticationID())
 	if err != nil {
-		return err
+		return common.ErrValueInvalid.Wrap(err)
 	}
 
 	if authentication.Controller() != dr.DID() {
-		return errors.Errorf(
+		return common.ErrValueInvalid.Errorf(
 			"Controller of authentication id, %v is not matched with DID in document, %v",
 			authentication.Controller(),
 			dr.DID(),
@@ -160,24 +160,24 @@ func (ba BaseAuthentication) Verify(op base.Operation, getStateFunc base.GetStat
 		details := authentication.Details()
 		pubKey, ok := details.(base.Publickey)
 		if !ok {
-			return errors.Errorf("expected PublicKey, but %T", details)
+			return common.ErrTypeMismatch.Errorf("expected PublicKey, but %T", details)
 		}
 
 		signature := base58.Decode(ba.ProofData())
 		err := pubKey.Verify(op.Fact().Hash().Bytes(), signature)
 		if err != nil {
-			return err
+			return common.ErrUserSignInvalid.Wrap(err)
 		}
 	case types.AuthTypeVC:
 		details := authentication.Details()
 		m, ok := details.(map[string]interface{})
 		if !ok {
-			return errors.Errorf("get authentication details")
+			return common.ErrTypeMismatch.Errorf("expected map, but %T", details)
 		}
 		p := m["proof"]
 		proof, ok := p.(types.Proof)
 		if !ok {
-			return errors.Errorf("get vc proof")
+			return common.ErrTypeMismatch.Errorf("expected Proof, but %T", p)
 		}
 		vm := proof.VerificationMethod()
 		dr, err := types.NewDIDResourceFromString(vm)
@@ -187,36 +187,39 @@ func (ba BaseAuthentication) Verify(op base.Operation, getStateFunc base.GetStat
 
 		var doc types.DIDDocument
 		if st, err := state.ExistsState(didstate.DocumentStateKey(contract, dr.DID()), "did document", getStateFunc); err != nil {
-			return err
+			return common.ErrStateNF.Wrap(err)
 		} else if doc, err = didstate.GetDocumentFromState(st); err != nil {
-			return err
+			return common.ErrStateValInvalid.Wrap(err)
 		}
 
 		sAuthentication, err := doc.Authentication(vm)
 		if err != nil {
-			return err
+			return common.ErrValueInvalid.Wrap(err)
 		}
 
 		if sAuthentication.Controller() != dr.DID() {
-			return errors.Errorf(
-				"Controller of authentication id, %v is not matched with DID in document, %v", authentication.Controller(), dr.DID())
+			return common.ErrValueInvalid.Errorf(
+				"Controller of authentication id, %v is not matched with DID in document, %v",
+				authentication.Controller(),
+				dr.DID(),
+			)
 		}
 
 		if sAuthentication.AuthType() != types.AuthTypeECDSASECP {
-			return errors.Errorf("auth type must be EcdsaSecp256k1VerificationKey2019")
+			return common.ErrAthTypeInvalid.Errorf("auth type must be EcdsaSecp256k1VerificationKey2019")
 		}
 
 		sDetails := sAuthentication.Details()
 		pubKey, ok := sDetails.(base.Publickey)
 		if !ok {
-			return errors.Errorf("expected PublicKey, but %T", details)
+			return common.ErrTypeMismatch.Errorf("expected PublicKey, but %T", details)
 		}
 
 		signature := base58.Decode(ba.ProofData())
 
 		err = pubKey.Verify(op.Fact().Hash().Bytes(), signature)
 		if err != nil {
-			return errors.Errorf("signature verification failed, %v", err)
+			return common.ErrSignInvalid.Wrap(err)
 		}
 	default:
 	}
@@ -269,14 +272,17 @@ func (bs BaseSettlement) Verify(op base.Operation, getStateFunc base.GetStateFun
 	if opSender == nil {
 		return errors.Errorf("empty op sender")
 	}
-	if err := state.CheckFactSignsByState(opSender, op.Signs(), getStateFunc); err != nil {
-		return err
-	}
 
 	if _, _, aErr, cErr := state.ExistsCAccount(opSender, "op sender", true, false, getStateFunc); aErr != nil {
 		return aErr
 	} else if cErr != nil {
-		return cErr
+		return common.ErrPreProcess.
+			Wrap(common.ErrCAccountNA.
+				Errorf("%v", cErr))
+	}
+
+	if err := state.CheckFactSignsByState(opSender, op.Signs(), getStateFunc); err != nil {
+		return err
 	}
 
 	return nil
@@ -335,26 +341,26 @@ func (bs BaseProxyPayer) ExtType() string {
 func (bs BaseProxyPayer) Verify(op base.Operation, getStateFunc base.GetStateFunc) error {
 	proxyPayer := bs.ProxyPayer()
 	if proxyPayer == nil {
-		return errors.Errorf("empty proxy payer")
+		return common.ErrValueInvalid.Errorf("empty proxy payer")
 	}
 	feeBaser, ok := op.Fact().(FeeAble)
 	if !ok {
-		return errors.Errorf("failed to get fact sender from operation")
+		return common.ErrTypeMismatch.Errorf("expected FeeAble but %T", op.Fact())
 	}
 
 	sender := feeBaser.FeePayer()
 	if sender == nil {
-		return errors.Errorf("empty fact sender")
+		return common.ErrValueInvalid.Errorf("empty fact sender")
 	}
 
 	if _, cSt, aErr, cErr := state.ExistsCAccount(proxyPayer, "proxy payer", true, true, getStateFunc); aErr != nil {
 		return aErr
 	} else if cErr != nil {
-		return cErr
+		return errors.Errorf("%v", cErr)
 	} else if ca, err := estate.LoadCAStateValue(cSt); err != nil {
 		return err
 	} else if !ca.IsRecipients(sender) {
-		return errors.Errorf("user is not recipient of proxy payer")
+		return common.ErrAccountNAth.Errorf("user, %v is not recipient of proxy payer, %v", sender, proxyPayer)
 	}
 
 	return nil
@@ -541,7 +547,7 @@ func VerifyFeeAble(fact FeeAble, getStateFunc base.GetStateFunc) base.OperationP
 	if len(fact.FeeBase()) < 1 {
 		return base.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.
-				Errorf("empty Fee Base"))
+				Errorf("fail to get Fee Base, empty Fee Base "))
 	}
 
 	for cid := range fact.FeeBase() {
@@ -549,7 +555,7 @@ func VerifyFeeAble(fact FeeAble, getStateFunc base.GetStateFunc) base.OperationP
 		if err != nil {
 			return base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.
-					Errorf("fail to get currency %v", cid))
+					Errorf("%v", err))
 		}
 	}
 
@@ -569,7 +575,7 @@ func VerifyFactUser(fact FactUser, getStateFunc base.GetStateFunc) base.Operatio
 	if user == nil {
 		return base.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.
-				Errorf("empty user account"))
+				Errorf("failed to get FactUser, empty user account"))
 	}
 	if _, _, aErr, cErr := state.ExistsCAccount(user, "sender", true, false, getStateFunc); aErr != nil {
 		return base.NewBaseOperationProcessReasonError(
@@ -596,12 +602,12 @@ func VerifyContractOwnerOnly(fact ContractOwnerOnly, getStateFunc base.GetStateF
 		if contract == nil {
 			return base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.
-					Errorf("empty contract account"))
+					Errorf("failed to get contract account, empty contract account"))
 		}
 		if sender == nil {
 			return base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.
-					Errorf("empty sender account"))
+					Errorf("failed to get sender, empty sender account"))
 		}
 
 		if _, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc); aErr != nil {
@@ -644,12 +650,12 @@ func VerifyInActiveContractOwnerHandlerOnly(fact InActiveContractOwnerHandlerOnl
 		if contract == nil {
 			return base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.
-					Errorf("empty contract account"))
+					Errorf("failed to get contract account, empty contract account"))
 		}
 		if sender == nil {
 			return base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.
-					Errorf("empty sender account"))
+					Errorf("failed to get sender, empty sender account"))
 		}
 
 		_, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc)
@@ -696,12 +702,12 @@ func VerifyActiveContractOwnerHandlerOnly(fact ActiveContractOwnerHandlerOnly, g
 		if contract == nil {
 			return base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.
-					Errorf("empty contract account"))
+					Errorf("failed to get contract account, empty contract account"))
 		}
 		if sender == nil {
 			return base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.
-					Errorf("empty sender account"))
+					Errorf("failed to get sender, empty sender account"))
 		}
 
 		_, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc)
@@ -745,7 +751,7 @@ func VerifyActiveContract(fact ActiveContract, getStateFunc base.GetStateFunc) b
 		if contract == nil {
 			return base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.
-					Errorf("empty contract account"))
+					Errorf("failed to get contract account, empty contract account"))
 		}
 
 		_, cSt, aErr, cErr := state.ExistsCAccount(contract, "contract", true, true, getStateFunc)

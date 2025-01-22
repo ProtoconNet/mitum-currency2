@@ -91,7 +91,7 @@ func (opp *UpdateDIDDocumentProcessor) PreProcess(
 	if err != nil {
 		return nil, base.NewBaseOperationProcessReasonError(
 			common.ErrMPreProcess.
-				Wrap(common.ErrMValueInvalid).Errorf("did scheme is invalid %v",
+				Wrap(common.ErrMValueInvalid).Errorf("invalid DID scheme, %v",
 				fact.DID(),
 			)), nil
 	}

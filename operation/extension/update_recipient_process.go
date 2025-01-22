@@ -77,7 +77,7 @@ func (opp *UpdateRecipientProcessor) PreProcess(
 			return ctx, base.NewBaseOperationProcessReasonError(
 				common.ErrMPreProcess.
 					Wrap(common.ErrMCAccountNA).
-					Errorf("%v: recipient %v is contract account", cErr, fact.Recipients()[i])), nil
+					Errorf("%v", cErr)), nil
 		}
 	}
 

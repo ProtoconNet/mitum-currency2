@@ -181,7 +181,7 @@ func (sv DocumentStateValue) HashBytes() []byte {
 func GetDocumentFromState(st base.State) (types.DIDDocument, error) {
 	v := st.Value()
 	if v == nil {
-		return types.DIDDocument{}, errors.Errorf("State value is nil")
+		return types.DIDDocument{}, common.ErrStateValInvalid.Errorf("State value is nil")
 	}
 
 	ts, ok := v.(DocumentStateValue)
