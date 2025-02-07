@@ -751,8 +751,7 @@ func CheckBalanceStateMergeValue(stateMergeValues []base.StateMergeValue, getSta
 	balanceValues := make(map[string]BalanceValue)
 	for i := range stateMergeValues {
 		if ccstate.IsBalanceStateKey(stateMergeValues[i].Key()) {
-			suffix := ccstate.BalanceStateKeySuffix[1:]
-			parsed, err := state.ParseStateKeyBySuffix(stateMergeValues[i].Key(), suffix, 3)
+			parsed, err := ccstate.ParseBalanceStateKey(stateMergeValues[i].Key())
 			if err != nil {
 				return nil, err
 			}

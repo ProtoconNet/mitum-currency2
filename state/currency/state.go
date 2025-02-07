@@ -242,6 +242,19 @@ func IsBalanceStateKey(key string) bool {
 	return strings.HasSuffix(key, BalanceStateKeySuffix)
 }
 
+func ParseBalanceStateKey(key string) (*[3]string, error) {
+	if !IsBalanceStateKey(BalanceStateKeySuffix) {
+		return nil, errors.Errorf("State Key, %v not include BalanceStateKeySuffix, %s", key, BalanceStateKeySuffix)
+	}
+	sp := strings.Split(key, ":")
+	nsp := strings.Split(sp[0], "-")
+	if len(nsp) < 2 {
+		return nil, errors.Errorf("invalid state Key, %v", key)
+	}
+	addr := strings.TrimSuffix(sp[0], "-"+nsp[len(nsp)-1])
+	return &[3]string{addr, nsp[len(nsp)-1], sp[1]}, nil
+}
+
 func IsDesignStateKey(key string) bool {
 	return strings.HasPrefix(key, DesignStateKeyPrefix)
 }
