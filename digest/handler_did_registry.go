@@ -34,7 +34,7 @@ func (hd *Handlers) handleDIDDesign(w http.ResponseWriter, r *http.Request) {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 
 		if !shared {
-			HTTP2WriteCache(w, cacheKey, time.Second*3)
+			HTTP2WriteCache(w, cacheKey, time.Hour*3000)
 		}
 	}
 }
@@ -107,7 +107,7 @@ func (hd *Handlers) handleDIDData(w http.ResponseWriter, r *http.Request) {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 
 		if !shared {
-			HTTP2WriteCache(w, cacheKey, time.Second*3)
+			HTTP2WriteCache(w, cacheKey, time.Hour*3000)
 		}
 	}
 }
@@ -179,7 +179,7 @@ func (hd *Handlers) handleDIDDocument(w http.ResponseWriter, r *http.Request) {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 
 		if !shared {
-			HTTP2WriteCache(w, cacheKey, time.Second*3)
+			HTTP2WriteCache(w, cacheKey, time.Millisecond*100)
 		}
 	}
 }
