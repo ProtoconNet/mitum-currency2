@@ -12,7 +12,6 @@ import (
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
-	"github.com/pkg/errors"
 )
 
 var withdrawItemProcessorPool = sync.Pool{
@@ -49,7 +48,9 @@ func (opp *WithdrawItemProcessor) PreProcess(
 		_, cSt, _, _ := cstate.ExistsCAccount(opp.item.Target(), "target contract", true, true, getStateFunc)
 		status, _ := cestate.StateContractAccountValue(cSt)
 		if status.BalanceStatus() != types.Allowed {
-			return e.Wrap(errors.Errorf("balance of contract account, %v is not allowed to withdraw", opp.item.Target()))
+			return e.Wrap(
+				common.ErrCAccountRS.Errorf(
+					"balance of contract account, %v is not allowed to withdraw", opp.item.Target()))
 		}
 
 		am := opp.item.Amounts()[i]
@@ -65,7 +66,7 @@ func (opp *WithdrawItemProcessor) PreProcess(
 		}
 
 		if balance.Big().Compare(am.Big()) < 0 {
-			return errors.Errorf("insufficient contract account balance")
+			return e.Wrap(common.ErrValueInvalid.Errorf("insufficient balance of currency, %v of contract account, %v", am.Currency(), opp.item.Target()))
 		}
 	}
 
