@@ -143,9 +143,17 @@ func (opp *TransferProcessor) PreProcess(
 		), nil
 	}
 
+	currencyID := make(map[types.CurrencyID]struct{})
 	var wg sync.WaitGroup
 	errChan := make(chan *base.BaseOperationProcessReasonError, len(fact.items))
 	for i := range fact.items {
+		for j := range fact.items[i].Amounts() {
+			cid := fact.items[i].Amounts()[j].Currency()
+			if _, found := currencyID[cid]; !found {
+				currencyID[cid] = struct{}{}
+			}
+		}
+
 		wg.Add(1)
 		go func(item TransferItem) {
 			defer wg.Done()
@@ -178,6 +186,14 @@ func (opp *TransferProcessor) PreProcess(
 	for err := range errChan {
 		if err != nil {
 			return nil, *err, nil
+		}
+	}
+
+	for cid := range currencyID {
+		if err := state.CheckExistsState(currency.BalanceStateKey(fact.Sender(), cid), getStateFunc); err != nil {
+			return nil, base.NewBaseOperationProcessReasonError(
+					common.ErrMStateNF.Errorf("balance of currency, %v of account, %v", cid, fact.Sender())),
+				nil
 		}
 	}
 
@@ -249,7 +265,7 @@ func (opp *TransferProcessor) Process( // nolint:dupl
 
 	totalAmounts, err := PrepareSenderTotalAmounts(fact.Sender(), required, getStateFunc)
 	if err != nil {
-		return nil, base.NewBaseOperationProcessReasonError("process CreateAccount; %w", err), nil
+		return nil, base.NewBaseOperationProcessReasonError("%w", err), nil
 	}
 
 	for key, total := range totalAmounts {

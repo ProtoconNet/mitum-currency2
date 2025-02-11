@@ -176,7 +176,15 @@ func (opp *CreateAccountProcessor) PreProcess(
 			nil
 	}
 
+	currencyID := make(map[types.CurrencyID]struct{})
 	for i := range fact.items {
+		for j := range fact.items[i].Amounts() {
+			cid := fact.items[i].Amounts()[j].Currency()
+			if _, found := currencyID[cid]; !found {
+				currencyID[cid] = struct{}{}
+			}
+		}
+
 		cip := createAccountItemProcessorPool.Get()
 		c, ok := cip.(*CreateAccountItemProcessor)
 		if !ok {
@@ -196,6 +204,14 @@ func (opp *CreateAccountProcessor) PreProcess(
 		}
 
 		c.Close()
+	}
+
+	for cid := range currencyID {
+		if err := state.CheckExistsState(currency.BalanceStateKey(fact.Sender(), cid), getStateFunc); err != nil {
+			return nil, base.NewBaseOperationProcessReasonError(
+					common.ErrMStateNF.Errorf("balance of currency, %v of account, %v", cid, fact.Sender())),
+				nil
+		}
 	}
 
 	return ctx, nil, nil

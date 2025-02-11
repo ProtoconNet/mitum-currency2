@@ -204,8 +204,15 @@ func (opp *CreateContractAccountProcessor) PreProcess(
 	items := fact.Items()
 	var wg sync.WaitGroup
 	errChan := make(chan *base.BaseOperationProcessReasonError, len(items))
-
+	currencyID := make(map[types.CurrencyID]struct{})
 	for i := range items {
+		for j := range fact.items[i].Amounts() {
+			cid := fact.items[i].Amounts()[j].Currency()
+			if _, found := currencyID[cid]; !found {
+				currencyID[cid] = struct{}{}
+			}
+		}
+
 		wg.Add(1)
 		go func(item CreateContractAccountItem) {
 			defer wg.Done()
@@ -241,6 +248,14 @@ func (opp *CreateContractAccountProcessor) PreProcess(
 	for err := range errChan {
 		if err != nil {
 			return nil, *err, nil
+		}
+	}
+
+	for cid := range currencyID {
+		if err := state.CheckExistsState(ccstate.BalanceStateKey(fact.Sender(), cid), getStateFunc); err != nil {
+			return nil, base.NewBaseOperationProcessReasonError(
+					common.ErrMStateNF.Errorf("balance of currency, %v of account, %v", cid, fact.Sender())),
+				nil
 		}
 	}
 
