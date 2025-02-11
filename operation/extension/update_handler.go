@@ -16,8 +16,6 @@ var (
 	UpdateHandlerHint     = hint.MustNewHint("mitum-extension-update-handler-operation-v0.0.1")
 )
 
-const MaxHandlers = 20
-
 type UpdateHandlerFact struct {
 	base.BaseFact
 	sender   base.Address
@@ -72,8 +70,10 @@ func (fact UpdateHandlerFact) IsValid(b []byte) error {
 		return common.ErrFactInvalid.Wrap(err)
 	}
 
-	if len(fact.handlers) > MaxHandlers {
-		return common.ErrFactInvalid.Wrap(common.ErrArrayLen.Wrap(errors.Errorf("number of handlers, %d, exceeds maximum limit, %d", len(fact.handlers), MaxHandlers)))
+	if len(fact.handlers) > types.MaxHandlers {
+		return common.ErrFactInvalid.Wrap(common.ErrArrayLen.Wrap(
+			errors.Errorf(
+				"number of handlers, %d, exceeds maximum limit, %d", len(fact.handlers), types.MaxHandlers)))
 	}
 
 	handlersMap := make(map[string]struct{})

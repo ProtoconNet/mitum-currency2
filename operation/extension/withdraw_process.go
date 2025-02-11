@@ -2,14 +2,15 @@ package extension
 
 import (
 	"context"
-	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
 	"sync"
 
 	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/ProtoconNet/mitum-currency/v3/operation/extras"
+	cstate "github.com/ProtoconNet/mitum-currency/v3/state"
 	ccstate "github.com/ProtoconNet/mitum-currency/v3/state/currency"
+	cestate "github.com/ProtoconNet/mitum-currency/v3/state/extension"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
 	"github.com/ProtoconNet/mitum2/base"
-
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/pkg/errors"
 )
@@ -45,6 +46,12 @@ func (opp *WithdrawItemProcessor) PreProcess(
 	e := util.StringError("preprocess WithdrawItemProcessor")
 
 	for i := range opp.item.Amounts() {
+		_, cSt, _, _ := cstate.ExistsCAccount(opp.item.Target(), "target contract", true, true, getStateFunc)
+		status, _ := cestate.StateContractAccountValue(cSt)
+		if status.BalanceStatus() != types.Allowed {
+			return e.Wrap(errors.Errorf("balance of contract account, %v is not allowed to withdraw", opp.item.Target()))
+		}
+
 		am := opp.item.Amounts()[i]
 
 		st, _, err := getStateFunc(ccstate.BalanceStateKey(opp.item.Target(), am.Currency()))

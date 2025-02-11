@@ -16,8 +16,6 @@ var (
 	UpdateRecipientHint     = hint.MustNewHint("mitum-extension-update-recipient-operation-v0.0.1")
 )
 
-const MaxRecipients = 20
-
 type UpdateRecipientFact struct {
 	base.BaseFact
 	sender     base.Address
@@ -72,20 +70,25 @@ func (fact UpdateRecipientFact) IsValid(b []byte) error {
 		return common.ErrFactInvalid.Wrap(err)
 	}
 
-	if len(fact.recipients) > MaxRecipients {
-		return common.ErrFactInvalid.Wrap(common.ErrArrayLen.Wrap(errors.Errorf("number of recipients, %d, exceeds maximum limit, %d", len(fact.recipients), MaxRecipients)))
+	if len(fact.recipients) > types.MaxRecipients {
+		return common.ErrFactInvalid.Wrap(
+			common.ErrArrayLen.Wrap(
+				errors.Errorf(
+					"number of recipients, %d, exceeds maximum limit, %d", len(fact.recipients), types.MaxRecipients)))
 	}
 
 	recipientsMap := make(map[string]struct{})
 	for i := range fact.recipients {
 		_, found := recipientsMap[fact.recipients[i].String()]
 		if found {
-			return common.ErrFactInvalid.Wrap(common.ErrDupVal.Wrap(errors.Errorf("recipient %v", fact.recipients[i])))
+			return common.ErrFactInvalid.Wrap(
+				common.ErrDupVal.Wrap(errors.Errorf("recipient %v", fact.recipients[i])))
 		} else {
 			recipientsMap[fact.recipients[i].String()] = struct{}{}
 		}
 		if err := fact.recipients[i].IsValid(nil); err != nil {
-			return common.ErrFactInvalid.Wrap(common.ErrValueInvalid.Wrap(errors.Errorf("invalid recipient address %v", err)))
+			return common.ErrFactInvalid.Wrap(
+				common.ErrValueInvalid.Wrap(errors.Errorf("invalid recipient address %v", err)))
 		}
 	}
 

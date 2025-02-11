@@ -12,6 +12,7 @@ func (cs *ContractAccountStatus) unpack(
 	ht hint.Hint,
 	ow string,
 	ia bool,
+	bs uint8,
 	hds, rcps []string,
 ) error {
 	cs.BaseHinter = hint.NewBaseHinter(ht)
@@ -24,6 +25,12 @@ func (cs *ContractAccountStatus) unpack(
 	}
 
 	cs.isActive = ia
+	balanceStatus := BalanceStatus(bs)
+	if err := balanceStatus.IsValid(nil); err != nil {
+		return errors.Errorf("Invalid balancestatus value, %v", bs)
+	}
+	cs.balanceStatus = balanceStatus
+
 	handlers := make([]base.Address, len(hds))
 	for i, hd := range hds {
 		switch handler, err := base.DecodeAddress(hd, enc); {

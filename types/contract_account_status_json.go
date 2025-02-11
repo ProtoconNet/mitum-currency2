@@ -9,28 +9,31 @@ import (
 
 type ContractAccountStatusJSONMarshaler struct {
 	hint.BaseHinter
-	Owner      base.Address   `json:"owner"`
-	IsActive   bool           `json:"is_active"`
-	Handlers   []base.Address `json:"handlers"`
-	Recipients []base.Address `json:"recipients"`
+	Owner         base.Address   `json:"owner"`
+	IsActive      bool           `json:"is_active"`
+	BalanceStatus BalanceStatus  `json:"balance_status"`
+	Handlers      []base.Address `json:"handlers"`
+	Recipients    []base.Address `json:"recipients"`
 }
 
 func (cs ContractAccountStatus) MarshalJSON() ([]byte, error) {
 	return util.MarshalJSON(ContractAccountStatusJSONMarshaler{
-		BaseHinter: cs.BaseHinter,
-		Owner:      cs.owner,
-		IsActive:   cs.isActive,
-		Handlers:   cs.handlers,
-		Recipients: cs.recipients,
+		BaseHinter:    cs.BaseHinter,
+		Owner:         cs.owner,
+		IsActive:      cs.isActive,
+		BalanceStatus: cs.balanceStatus,
+		Handlers:      cs.handlers,
+		Recipients:    cs.recipients,
 	})
 }
 
 type ContractAccountStatusJSONUnmarshaler struct {
-	Hint       hint.Hint `json:"_hint"`
-	Owner      string    `json:"owner"`
-	IsActive   bool      `json:"is_active"`
-	Handlers   []string  `json:"handlers"`
-	Recipients []string  `json:"recipients"`
+	Hint          hint.Hint `json:"_hint"`
+	Owner         string    `json:"owner"`
+	IsActive      bool      `json:"is_active"`
+	BalanceStatus uint8     `json:"balance_status"`
+	Handlers      []string  `json:"handlers"`
+	Recipients    []string  `json:"recipients"`
 }
 
 func (cs *ContractAccountStatus) DecodeJSON(b []byte, enc encoder.Encoder) error {
@@ -41,5 +44,5 @@ func (cs *ContractAccountStatus) DecodeJSON(b []byte, enc encoder.Encoder) error
 		return e.Wrap(err)
 	}
 
-	return cs.unpack(enc, ucs.Hint, ucs.Owner, ucs.IsActive, ucs.Handlers, ucs.Recipients)
+	return cs.unpack(enc, ucs.Hint, ucs.Owner, ucs.IsActive, ucs.BalanceStatus, ucs.Handlers, ucs.Recipients)
 }

@@ -10,21 +10,23 @@ import (
 func (cs ContractAccountStatus) MarshalBSON() ([]byte, error) {
 	return bsonenc.Marshal(
 		bson.M{
-			"_hint":      cs.Hint().String(),
-			"owner":      cs.owner,
-			"is_active":  cs.isActive,
-			"handlers":   cs.handlers,
-			"recipients": cs.recipients,
+			"_hint":          cs.Hint().String(),
+			"owner":          cs.owner,
+			"is_active":      cs.isActive,
+			"balance_status": cs.balanceStatus,
+			"handlers":       cs.handlers,
+			"recipients":     cs.recipients,
 		},
 	)
 }
 
 type ContractAccountBSONUnmarshaler struct {
-	Hint       string   `bson:"_hint"`
-	Owner      string   `bson:"owner"`
-	IsActive   bool     `bson:"is_active"`
-	Handlers   []string `bson:"handlers"`
-	Recipients []string `bson:"recipients"`
+	Hint          string   `bson:"_hint"`
+	Owner         string   `bson:"owner"`
+	IsActive      bool     `bson:"is_active"`
+	BalanceStatus uint8    `bson:"balance_status"`
+	Handlers      []string `bson:"handlers"`
+	Recipients    []string `bson:"recipients"`
 }
 
 func (cs *ContractAccountStatus) DecodeBSON(b []byte, enc *bsonenc.Encoder) error {
@@ -40,5 +42,5 @@ func (cs *ContractAccountStatus) DecodeBSON(b []byte, enc *bsonenc.Encoder) erro
 		return e.Wrap(err)
 	}
 
-	return cs.unpack(enc, ht, ucs.Owner, ucs.IsActive, ucs.Handlers, ucs.Recipients)
+	return cs.unpack(enc, ht, ucs.Owner, ucs.IsActive, ucs.BalanceStatus, ucs.Handlers, ucs.Recipients)
 }

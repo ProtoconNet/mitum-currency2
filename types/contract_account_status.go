@@ -2,6 +2,8 @@ package types // nolint: dupl, revive
 
 import (
 	"bytes"
+	"github.com/ProtoconNet/mitum-currency/v3/common"
+	"github.com/pkg/errors"
 	"regexp"
 	"sort"
 
@@ -13,12 +15,36 @@ import (
 
 var ContractAccountStatusHint = hint.MustNewHint("mitum-currency-contract-account-status-v0.0.1")
 
+const MaxHandlers = 20
+const MaxRecipients = 20
+
+type BalanceStatus uint8
+
+const (
+	Allowed = iota
+	WithdrawalBlocked
+	MaxBalanceStatus // last value is used for read length of BalanceStatus
+)
+
+func (bs BalanceStatus) IsValid([]byte) error {
+	if uint(bs) > MaxBalanceStatus-1 {
+		return common.ErrValueInvalid.Errorf("unexpected BalanceStatus, %v", bs)
+	}
+
+	return nil
+}
+
+func (bs BalanceStatus) Bytes() []byte {
+	return util.Uint8ToBytes(uint8(bs))
+}
+
 type ContractAccountStatus struct {
 	hint.BaseHinter
-	owner      base.Address
-	isActive   bool
-	handlers   []base.Address
-	recipients []base.Address
+	owner         base.Address
+	isActive      bool
+	balanceStatus BalanceStatus
+	handlers      []base.Address
+	recipients    []base.Address
 }
 
 func NewContractAccountStatus(owner base.Address, handlers []base.Address) ContractAccountStatus {
@@ -27,25 +53,37 @@ func NewContractAccountStatus(owner base.Address, handlers []base.Address) Contr
 	})
 
 	us := ContractAccountStatus{
-		BaseHinter: hint.NewBaseHinter(ContractAccountStatusHint),
-		owner:      owner,
-		isActive:   false,
-		handlers:   handlers,
+		BaseHinter:    hint.NewBaseHinter(ContractAccountStatusHint),
+		owner:         owner,
+		isActive:      false,
+		balanceStatus: Allowed,
+		handlers:      handlers,
 	}
 	return us
 }
 
 func (cs ContractAccountStatus) Bytes() []byte {
-	var v int8
+	var isActive int8
 	if cs.isActive {
-		v = 1
+		isActive = 1
 	}
+
 	handlers := make([][]byte, len(cs.handlers))
 	for i := range cs.handlers {
 		handlers[i] = cs.handlers[i].Bytes()
 	}
+	recipients := make([][]byte, len(cs.recipients))
+	for i := range cs.recipients {
+		recipients[i] = cs.recipients[i].Bytes()
+	}
 
-	return util.ConcatBytesSlice(cs.owner.Bytes(), []byte{byte(v)}, util.ConcatBytesSlice(handlers...))
+	return util.ConcatBytesSlice(
+		cs.owner.Bytes(),
+		[]byte{byte(isActive)},
+		cs.balanceStatus.Bytes(),
+		util.ConcatBytesSlice(handlers...),
+		util.ConcatBytesSlice(recipients...),
+	)
 }
 
 func (cs ContractAccountStatus) Hash() util.Hash {
@@ -60,8 +98,20 @@ func (cs ContractAccountStatus) IsValid([]byte) error { // nolint:revive
 	if err := util.CheckIsValiders(nil, false,
 		cs.BaseHinter,
 		cs.owner,
+		cs.balanceStatus,
 	); err != nil {
 		return err
+	}
+
+	if len(cs.handlers) > MaxHandlers {
+		return common.ErrArrayLen.Wrap(
+			errors.Errorf(
+				"number of handlers, %d, exceeds maximum limit, %d", len(cs.handlers), MaxHandlers))
+	}
+	if len(cs.recipients) > MaxRecipients {
+		return common.ErrArrayLen.Wrap(
+			errors.Errorf(
+				"number of recipients, %d, exceeds maximum limit, %d", len(cs.recipients), MaxRecipients))
 	}
 
 	return nil
@@ -146,21 +196,37 @@ func (cs ContractAccountStatus) IsActive() bool { // nolint:revive
 	return cs.isActive
 }
 
-func (cs ContractAccountStatus) SetIsActive(b bool) ContractAccountStatus { // nolint:revive
+func (cs ContractAccountStatus) SetActive(b bool) ContractAccountStatus { // nolint:revive
 	cs.isActive = b
+	return cs
+}
+
+func (cs ContractAccountStatus) BalanceStatus() BalanceStatus { // nolint:revive
+	return cs.balanceStatus
+}
+
+func (cs ContractAccountStatus) SetBalanceStatus(b BalanceStatus) ContractAccountStatus { // nolint:revive
+	cs.balanceStatus = b
 	return cs
 }
 
 func (cs ContractAccountStatus) Equal(b ContractAccountStatus) bool {
 	if cs.isActive != b.isActive {
 		return false
-	}
-	if !cs.owner.Equal(b.owner) {
+	} else if cs.balanceStatus != b.balanceStatus {
+		return false
+	} else if !cs.owner.Equal(b.owner) {
 		return false
 	}
 
 	for i := range cs.handlers {
 		if !cs.handlers[i].Equal(b.handlers[i]) {
+			return false
+		}
+	}
+
+	for i := range cs.recipients {
+		if !cs.recipients[i].Equal(b.recipients[i]) {
 			return false
 		}
 	}
