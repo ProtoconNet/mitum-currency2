@@ -55,9 +55,11 @@ func (opp *WithdrawItemProcessor) PreProcess(
 
 		am := opp.item.Amounts()[i]
 
-		st, _, err := getStateFunc(ccstate.BalanceStateKey(opp.item.Target(), am.Currency()))
+		st, found, err := getStateFunc(ccstate.BalanceStateKey(opp.item.Target(), am.Currency()))
 		if err != nil {
 			return e.Wrap(err)
+		} else if !found {
+			return e.Wrap(common.ErrStateNF.Errorf("balance of currency, %v of contract account, %v", am.Currency(), opp.item.Target()))
 		}
 
 		balance, err := ccstate.StateBalanceValue(st)
