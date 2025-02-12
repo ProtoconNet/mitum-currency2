@@ -1,12 +1,10 @@
 package digest
 
 import (
-	"net/http"
-	"time"
-
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/ProtoconNet/mitum2/util"
 	"github.com/gorilla/mux"
+	"net/http"
 )
 
 var halBlockTemplate = map[string]HalLink{
@@ -30,7 +28,7 @@ func (hd *Handlers) handleBlock(w http.ResponseWriter, r *http.Request) {
 	} else {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 		if !shared {
-			HTTP2WriteCache(w, cachekey, time.Hour*3000)
+			HTTP2WriteCache(w, cachekey, hd.expireLongLived)
 		}
 	}
 }

@@ -49,7 +49,7 @@ func (hd *Handlers) handleAccount(w http.ResponseWriter, r *http.Request) {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 
 		if !shared {
-			HTTP2WriteCache(w, cachekey, time.Millisecond*100)
+			HTTP2WriteCache(w, cachekey, hd.expireShortLived)
 		}
 	}
 }

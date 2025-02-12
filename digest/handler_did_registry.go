@@ -5,7 +5,6 @@ import (
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/pkg/errors"
 	"net/http"
-	"time"
 )
 
 var (
@@ -34,7 +33,7 @@ func (hd *Handlers) handleDIDDesign(w http.ResponseWriter, r *http.Request) {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 
 		if !shared {
-			HTTP2WriteCache(w, cacheKey, time.Hour*3000)
+			HTTP2WriteCache(w, cacheKey, hd.expireLongLived)
 		}
 	}
 }
@@ -107,7 +106,7 @@ func (hd *Handlers) handleDIDData(w http.ResponseWriter, r *http.Request) {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 
 		if !shared {
-			HTTP2WriteCache(w, cacheKey, time.Hour*3000)
+			HTTP2WriteCache(w, cacheKey, hd.expireLongLived)
 		}
 	}
 }
@@ -179,7 +178,7 @@ func (hd *Handlers) handleDIDDocument(w http.ResponseWriter, r *http.Request) {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 
 		if !shared {
-			HTTP2WriteCache(w, cacheKey, time.Millisecond*100)
+			HTTP2WriteCache(w, cacheKey, hd.expireShortLived)
 		}
 	}
 }

@@ -61,6 +61,12 @@ var (
 	UnknownProblemJSON []byte
 )
 
+const (
+	ExpireFilled     = time.Second * 3
+	ExpireShortLived = time.Millisecond * 100
+	ExpireLongLived  = time.Hour * 3000
+)
+
 var GlobalItemsLimit int64 = 10
 
 func init() {
@@ -83,11 +89,13 @@ type Handlers struct {
 	send            func(interface{}) (base.Operation, error)
 	client          func() (*quicstream.ConnectionPool, *quicmemberlist.Memberlist, []quicstream.ConnInfo, error)
 	//connectionPool  *quicstream.ConnectionPool
-	router          *mux.Router
-	routes          map[ /* path */ string]*mux.Route
-	itemsLimiter    func(string /* request type */) int64
-	rg              *singleflight.Group
-	expireNotFilled time.Duration
+	router           *mux.Router
+	routes           map[ /* path */ string]*mux.Route
+	itemsLimiter     func(string /* request type */) int64
+	rg               *singleflight.Group
+	expireNotFilled  time.Duration
+	expireShortLived time.Duration
+	expireLongLived  time.Duration
 }
 
 func NewHandlers(
@@ -106,18 +114,20 @@ func NewHandlers(
 	}
 
 	return &Handlers{
-		Logger:          log.Log(),
-		networkID:       networkID,
-		encs:            encs,
-		enc:             enc,
-		database:        st,
-		cache:           cache,
-		queue:           queue,
-		router:          router,
-		routes:          map[string]*mux.Route{},
-		itemsLimiter:    DefaultItemsLimiter,
-		rg:              &singleflight.Group{},
-		expireNotFilled: time.Second * 3,
+		Logger:           log.Log(),
+		networkID:        networkID,
+		encs:             encs,
+		enc:              enc,
+		database:         st,
+		cache:            cache,
+		queue:            queue,
+		router:           router,
+		routes:           map[string]*mux.Route{},
+		itemsLimiter:     DefaultItemsLimiter,
+		rg:               &singleflight.Group{},
+		expireNotFilled:  ExpireFilled,
+		expireShortLived: ExpireShortLived,
+		expireLongLived:  ExpireLongLived,
 	}
 }
 

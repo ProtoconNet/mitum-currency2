@@ -3,13 +3,11 @@ package digest
 import (
 	"fmt"
 	"github.com/ProtoconNet/mitum-currency/v3/types"
-	"net/http"
-	"strings"
-	"time"
-
 	"github.com/ProtoconNet/mitum2/base"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"net/http"
+	"strings"
 )
 
 func (hd *Handlers) handleCurrencies(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +25,7 @@ func (hd *Handlers) handleCurrencies(w http.ResponseWriter, r *http.Request) {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 
 		if !shared {
-			HTTP2WriteCache(w, cachekey, time.Second*1)
+			HTTP2WriteCache(w, cachekey, hd.expireShortLived)
 		}
 	}
 }
@@ -82,7 +80,7 @@ func (hd *Handlers) handleCurrency(w http.ResponseWriter, r *http.Request) {
 		HTTP2WriteHalBytes(hd.enc, w, v.([]byte), http.StatusOK)
 
 		if !shared {
-			HTTP2WriteCache(w, cachekey, time.Second*1)
+			HTTP2WriteCache(w, cachekey, hd.expireShortLived)
 		}
 	}
 }
